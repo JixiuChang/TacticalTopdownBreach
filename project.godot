@@ -12,7 +12,11 @@ config_version=5
 
 config/name="TopdownTacticalBreacher"
 config/features=PackedStringArray("4.6", "Forward Plus")
-config/icon="res://icon.svg"
+
+[autoload]
+
+GameStateManager="*uid://l0xc7omj7fd4"
+TimeSimulator="*uid://dfk4m6x4lsjkh"
 
 [physics]
 
