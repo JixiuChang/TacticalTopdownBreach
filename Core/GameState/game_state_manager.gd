@@ -7,15 +7,11 @@ var current_phase: GamePhase = GamePhase.BRIEFING
 
 #Game Phase Actions
 signal phase_changed(new_phase: GamePhase)
-signal execution_completed()
-signal objective_failure()
-signal objective_success()
 signal rewind_requested(target_time: float)
 
 #Objective State
 var objective_completed: bool = false
 var objective_failed: bool = false
-var execution_complete: bool = false
 
 #Timer
 var time_simulator: Node = null
@@ -33,8 +29,7 @@ func _ready() -> void:
 func _get_time_simulator() -> void:
 	if has_node("/root/TimeSimulator"):
 		time_simulator = get_node("/root/TimeSimulator")
-		#if time_simulator.has_signal("time_expired"):
-			#time_simulator.time_expired.connect(_on_time_expired)
+		time_simulator.time_expired.connect(_on_timeout)
 
 func _get_phase_name(phase: GamePhase) -> String:
 	match phase:
@@ -63,28 +58,104 @@ func set_phase(new_phase: GamePhase) -> void:
 func is_phase(phase: GamePhase) -> bool:
 	return phase == current_phase
 
-func is_planning() -> bool:
-	return current_phase == GamePhase.PLANNING
-
 func is_executing() -> bool:
 	return current_phase == GamePhase.EXECUTING
 
-func is_debrief() -> bool:
-	return current_phase == GamePhase.DEBRIEFING
+func phase_enter(new_phase: GamePhase) -> bool:
+	if _can_enter_phase(new_phase):
+		set_phase(new_phase)
+		return true
+	print("Invalid transition from ", _get_phase_name(current_phase), " to ", _get_phase_name(new_phase))
+	return false
+
+func _can_enter_phase(new_phase: GamePhase) -> bool:
+	match current_phase:
+		GamePhase.BRIEFING:
+			return new_phase == GamePhase.PLANNING
+		GamePhase.PLANNING:
+			return new_phase == GamePhase.EXECUTING
+		GamePhase.EXECUTING:
+			return new_phase == GamePhase.PLANNING || new_phase == GamePhase.DEBRIEFING
+		GamePhase.DEBRIEFING:
+			return new_phase == GamePhase.PLANNING
+	return false
+
+func start_execution() -> bool:
+	if current_phase == GamePhase.PLANNING:
+		if time_simulator:
+			time_simulator.start_execution()
+		return phase_enter(GamePhase.EXECUTING)
+	return false
+
+func pause_execution() -> bool:
+	if current_phase == GamePhase.EXECUTING:
+		if time_simulator:
+			time_simulator.pause()
+		return phase_enter(GamePhase.PLANNING)
+	return false
+
+func on_timeout() -> void:
+	if current_phase == GamePhase.EXECUTING:
+		if not objective_completed:
+			objective_failed = true
+		_debrief()
+
+func on_objective_completion() -> void:
+	objective_completed = true
+	_debrief()
+
+func on_execution_completion() -> void:
+	if current_phase == GamePhase.EXECUTING:
+		_debrief()
+
+func _debrief() -> void:
+	if objective_completed || objective_failed:
+		if time_simulator:
+			time_simulator.pause()
+		phase_enter(GamePhase.DEBRIEFING)
+	else:
+		if time_simulator:
+			time_simulator.pause()
+		phase_enter(GamePhase.PLANNING)
+
+func backlog_from_debrief(target_time: float) -> bool:
+	if current_phase == GamePhase.DEBRIEFING:
+		if target_time >= END_TIME and target_time <= START_TIME:
+			if time_simulator:
+				var min_time = time_simulator.get_min_executed_time()
+				
+				if target_time >= min_time:
+					if time_simulator.rewind_to(target_time):
+						reset_objective_state()
+						return phase_enter(GamePhase.PLANNING)
+				else:
+					print("Cannot rewind to time before execution: ", target_time, " (min executed: ", min_time, ")")
+	return false
+
+func reset_gamestate() -> void:
+	reset_objective_state()
+	
+	if time_simulator:
+		time_simulator.reset()
+	
+	set_phase(GamePhase.BRIEFING)
+
+func reset_objective_state() -> void:
+	objective_completed = false
+	objective_failed = false
 
 func _on_phase_entered(phase: GamePhase) -> void:
+	if !time_simulator:
+		return
+	
 	match phase:
 		GamePhase.PLANNING:
-			_reset_execution_phase()
-			if time_simulator:
-				time_simulator.pause()
+			time_simulator.pause()
 		GamePhase.EXECUTING:
-			if time_simulator:
-				time_simulator.start_execution()
+			time_simulator.start_execution()
 		GamePhase.DEBRIEFING:
-			if time_simulator:
-				time_simulator.pause()
-				time_simulator.enable_rewind()
-	
-func _reset_execution_phase() -> void:
-	execution_complete = false
+			time_simulator.pause()
+			time_simulator.enable_rewind()
+
+func _on_timeout() -> void:
+	on_timeout()
