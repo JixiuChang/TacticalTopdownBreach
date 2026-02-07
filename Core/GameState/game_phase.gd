@@ -1,4 +1,5 @@
 # ~/Core/GameState/game_phase.gd
+class_name GamePhaseEnum
 extends Node
 
 #Hold the game state. 

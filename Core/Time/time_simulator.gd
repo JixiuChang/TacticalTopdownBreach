@@ -1,26 +1,20 @@
 # ~/Core/Time/time_simulator.gd
 extends Node
 
-#delta debug
 var fixed_delta: float = 0.1
-var max_delta: float = 0.0
 var accumulator: float = 0.0
 var min_executed_time: float = 180.0
-var mode: String = "paused" #paused, playing, rewinding
+var mode: String = "paused"  # paused, playing, rewinding
 
-#Timer Constant
 var simulation_time: float = 180.0
 
-const ROUND_DURATION: float = 180.0
 const START_TIME: float = 180.0
 const END_TIME: float = 0.0
 
-#Rewind Snapshot Setting
 var snapshot_interval: float = 5.0
 var snapshots: Array[Dictionary] = []
 var max_snapshots: int = 36
 
-#Timer Actions
 signal time_advanced(new_time: float)
 signal time_expired()
 signal rewind_completed
@@ -33,18 +27,12 @@ func _ready() -> void:
 
 func _get_game_state_manager() -> void:
 	game_state_manager = get_node_or_null("/root/GameStateManager")
-	
 	if not game_state_manager:
 		var root = get_tree().root
 		for child in root.get_children():
 			if child.name == "GameStateManager":
 				game_state_manager = child
 				break
-	
-	if game_state_manager:
-		print("DEBUG: GameStateManager reference obtained successfully")
-	else:
-		print("ERROR: Failed to get GameStateManager reference")
 
 func _physics_process(delta: float) -> void:
 	if mode == "playing":
@@ -61,26 +49,20 @@ func _update_simulation(frame_delta: float) -> void:
 		accumulator -= fixed_delta
 		steps += 1
 	
-	if frame_delta > max_delta:
-		max_delta = frame_delta
-	
 	if accumulator > fixed_delta * 2.0:
 		print("Warning: Low framerate. Accumulator: ", accumulator)
 
 func _should_advance() -> bool:
-	if ! game_state_manager:
+	if not game_state_manager:
 		return false
-	
-	if ! game_state_manager.is_executing():
+	if not game_state_manager.is_executing():
 		return false
-	
 	if simulation_time <= END_TIME:
 		return false
-	
 	return true
 
 func advance() -> void:
-	if ! _should_advance():
+	if not _should_advance():
 		return
 	
 	simulation_time -= fixed_delta
@@ -148,23 +130,6 @@ func rewind_to(target_time: float) -> bool:
 	
 	if target_time < END_TIME or target_time > START_TIME:
 		return false
-	
-	if target_time >= START_TIME - 0.1: 
-		if snapshots.size() > 0:
-			var best_snapshot = {}
-			var best_diff = INF
-			for snapshot in snapshots:
-				var diff = abs(snapshot.time - START_TIME)
-				if diff < best_diff:
-					best_diff = diff
-					best_snapshot = snapshot
-			
-			if best_snapshot:
-				_restore_snapshot(best_snapshot)
-				simulation_time = best_snapshot.time
-				accumulator = 0.0
-				rewind_completed.emit()
-				return true
 	
 	var snapshot = _find_snapshot_for_time(target_time)
 	if snapshot:

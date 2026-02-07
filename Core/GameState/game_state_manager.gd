@@ -2,12 +2,11 @@
 extends Node
 
 #Game Phase
-const GamePhase = preload("res://Core/GameState/game_phase.gd").GamePhase
+const GamePhase = GamePhaseEnum.GamePhase
 var current_phase: GamePhase = GamePhase.BRIEFING
 
 #Game Phase Actions
 signal phase_changed(new_phase: GamePhase)
-signal rewind_requested(target_time: float)
 
 #Objective State
 var objective_completed: bool = false
