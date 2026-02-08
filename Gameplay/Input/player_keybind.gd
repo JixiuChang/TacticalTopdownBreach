@@ -92,8 +92,7 @@ func _set_action_key(keybind: String, key: int) -> void:
 
 func _dict_to_event(dict: Dictionary) -> InputEvent:
 	var event: InputEvent
-	if dict.is_empty():
-		return null
+	if dict.is_empty(): return null
 	
 	match dict.get("type", ""):
 		"key":
@@ -163,12 +162,10 @@ func rebind_key(action_name: String, new_event: InputEvent) -> void:
 	save_keybinds()
 
 func get_keybind_display_name(action_name: String) -> String:
-	if ! InputMap.has_action(action_name):
-		return "Not Set"
+	if ! InputMap.has_action(action_name): return "Not Set"
 	
 	var events = InputMap.action_get_events(action_name)
-	if events.is_empty():
-		return "Not Set"
+	if events.is_empty(): return "Not Set"
 	
 	var event = events[0]
 	if event is InputEventKey:
@@ -177,25 +174,14 @@ func get_keybind_display_name(action_name: String) -> String:
 	elif event is InputEventMouseButton:
 		var mouse_event = event as InputEventMouseButton
 		match mouse_event.button_index:
-			MOUSE_BUTTON_LEFT:
-				return "Left Click"
-			MOUSE_BUTTON_RIGHT:
-				return "Right Click"
-			MOUSE_BUTTON_MIDDLE:
-				return "Middle Click"
-			MOUSE_BUTTON_XBUTTON1:
-				return "Mouse Side 1"
-			MOUSE_BUTTON_XBUTTON2:
-				return "Mouse Side 2"
-			MOUSE_BUTTON_WHEEL_UP:
-				return "Wheel Up"
-			MOUSE_BUTTON_WHEEL_DOWN:
-				return "Wheel Down"
-			MOUSE_BUTTON_WHEEL_LEFT:
-				return "Wheel Left"
-			MOUSE_BUTTON_WHEEL_RIGHT:
-				return "Wheel Right"
-			_:
-				return "Mouse Button " + str(mouse_event.button_index)
-	
+			MOUSE_BUTTON_LEFT: return "Left Click"
+			MOUSE_BUTTON_RIGHT: return "Right Click"
+			MOUSE_BUTTON_MIDDLE: return "Middle Click"
+			MOUSE_BUTTON_XBUTTON1: return "Mouse Side 1"
+			MOUSE_BUTTON_XBUTTON2: return "Mouse Side 2"
+			MOUSE_BUTTON_WHEEL_UP: return "Wheel Up"
+			MOUSE_BUTTON_WHEEL_DOWN: return "Wheel Down"
+			MOUSE_BUTTON_WHEEL_LEFT: return "Wheel Left"
+			MOUSE_BUTTON_WHEEL_RIGHT: return "Wheel Right"
+			_: return "Mouse Button " + str(mouse_event.button_index)
 	return "Unknown"

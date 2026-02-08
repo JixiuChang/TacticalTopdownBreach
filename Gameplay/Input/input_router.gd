@@ -14,8 +14,7 @@ func _ready() -> void:
 		player_keybind = get_node_or_null("../PlayerKeybind")
 
 func _input(event: InputEvent) -> void:
-	if not player_keybind:
-		return
+	if not player_keybind: return
 	
 	var current_phase = GameStateManager.get_phase()
 	
@@ -50,16 +49,13 @@ func _handle_debrief_input(event: InputEvent) -> void:
 		GameStateManager.reset_gamestate()
 
 func _handle_ground_selection(event: InputEvent) -> void:
-	if not (event is InputEventMouseButton):
-		return
+	if not (event is InputEventMouseButton): return
 	
 	var mouse_event = event as InputEventMouseButton
-	if mouse_event.button_index != MOUSE_BUTTON_LEFT or not mouse_event.pressed:
-		return
+	if mouse_event.button_index != MOUSE_BUTTON_LEFT or not mouse_event.pressed: return
 	
 	var camera = get_viewport().get_camera_3d()
-	if not camera:
-		return
+	if not camera: return
 	
 	var from = camera.project_ray_origin(mouse_event.position)
 	var to = from + camera.project_ray_normal(mouse_event.position) * 1000.0
@@ -73,16 +69,13 @@ func _handle_ground_selection(event: InputEvent) -> void:
 		ground_selected.emit(result.position)
 
 func _handle_unit_selection(event: InputEvent) -> void:
-	if not (event is InputEventMouseButton):
-		return
+	if not (event is InputEventMouseButton): return
 	
 	var mouse_event = event as InputEventMouseButton
-	if mouse_event.button_index != MOUSE_BUTTON_LEFT or not mouse_event.pressed:
-		return
+	if mouse_event.button_index != MOUSE_BUTTON_LEFT or not mouse_event.pressed: return
 	
 	var camera = get_viewport().get_camera_3d()
-	if not camera:
-		return
+	if not camera: return
 	
 	var from = camera.project_ray_origin(mouse_event.position)
 	var to = from + camera.project_ray_normal(mouse_event.position) * 1000.0

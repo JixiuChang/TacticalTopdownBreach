@@ -53,17 +53,13 @@ func _update_simulation(frame_delta: float) -> void:
 		print("Warning: Low framerate. Accumulator: ", accumulator)
 
 func _should_advance() -> bool:
-	if not game_state_manager:
-		return false
-	if not game_state_manager.is_executing():
-		return false
-	if simulation_time <= END_TIME:
-		return false
+	if not game_state_manager: return false
+	if not game_state_manager.is_executing(): return false
+	if simulation_time <= END_TIME: return false
 	return true
 
 func advance() -> void:
-	if not _should_advance():
-		return
+	if not _should_advance(): return
 	
 	simulation_time -= fixed_delta
 	
@@ -125,11 +121,9 @@ func enable_rewind() -> void:
 	accumulator = 0.0
 
 func rewind_to(target_time: float) -> bool:
-	if mode != "rewinding" and mode != "paused":
-		return false
+	if mode != "rewinding" and mode != "paused": return false
 	
-	if target_time < END_TIME or target_time > START_TIME:
-		return false
+	if target_time < END_TIME or target_time > START_TIME: return false
 	
 	var snapshot = _find_snapshot_for_time(target_time)
 	if snapshot:

@@ -32,16 +32,11 @@ func _get_time_simulator() -> void:
 
 func _get_phase_name(phase: GamePhase) -> String:
 	match phase:
-		GamePhase.BRIEFING:
-			return "BRIEFING"
-		GamePhase.PLANNING:
-			return "PLANNING"
-		GamePhase.EXECUTING:
-			return "EXECUTING"
-		GamePhase.DEBRIEFING:
-			return "DEBRIEFING"
-		_:
-			return "UNKNOWN"
+		GamePhase.BRIEFING: return "BRIEFING"
+		GamePhase.PLANNING: return "PLANNING"
+		GamePhase.EXECUTING: return "EXECUTING"
+		GamePhase.DEBRIEFING: return "DEBRIEFING"
+		_: return "UNKNOWN"
 
 func get_phase() -> GamePhase:
 	return current_phase
@@ -69,14 +64,10 @@ func phase_enter(new_phase: GamePhase) -> bool:
 
 func _can_enter_phase(new_phase: GamePhase) -> bool:
 	match current_phase:
-		GamePhase.BRIEFING:
-			return new_phase == GamePhase.PLANNING
-		GamePhase.PLANNING:
-			return new_phase == GamePhase.EXECUTING
-		GamePhase.EXECUTING:
-			return new_phase == GamePhase.PLANNING || new_phase == GamePhase.DEBRIEFING
-		GamePhase.DEBRIEFING:
-			return new_phase == GamePhase.PLANNING
+		GamePhase.BRIEFING: return new_phase == GamePhase.PLANNING
+		GamePhase.PLANNING: return new_phase == GamePhase.EXECUTING
+		GamePhase.EXECUTING: return new_phase == GamePhase.PLANNING || new_phase == GamePhase.DEBRIEFING
+		GamePhase.DEBRIEFING: return new_phase == GamePhase.PLANNING
 	return false
 
 func start_execution() -> bool:
@@ -144,8 +135,7 @@ func reset_objective_state() -> void:
 	objective_failed = false
 
 func _on_phase_entered(phase: GamePhase) -> void:
-	if !time_simulator:
-		return
+	if !time_simulator: return
 	
 	match phase:
 		GamePhase.PLANNING:
