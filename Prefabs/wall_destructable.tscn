@@ -1,0 +1,24 @@
+[gd_scene format=3 uid="uid://bt48t3ywlj7pj"]
+
+[ext_resource type="Script" uid="uid://baejajn00uama" path="res://Prefabs/wall_destructable.gd" id="1_qioss"]
+[ext_resource type="Material" uid="uid://bmqij5bsnc86x" path="res://Assets/Materials/wall_material.tres" id="2_fx4uo"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_s7kjw"]
+size = Vector3(2, 2, 0.25)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_s7kjw"]
+size = Vector3(2, 2, 0.25)
+
+[node name="WallDestructable" type="StaticBody3D" unique_id=864497176]
+script = ExtResource("1_qioss")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=148861771]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+mesh = SubResource("BoxMesh_s7kjw")
+surface_material_override/0 = ExtResource("2_fx4uo")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=198925986]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+shape = SubResource("BoxShape3D_s7kjw")
+
+[node name="DebrisContainer" type="Node3D" parent="." unique_id=2013658184]

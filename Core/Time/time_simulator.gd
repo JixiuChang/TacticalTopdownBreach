@@ -15,6 +15,9 @@ var snapshot_interval: float = 5.0
 var snapshots: Array[Dictionary] = []
 var max_snapshots: int = 36
 
+var event_snapshots: Array[Dictionary] = [] 
+var max_event_snapshots: int = 100
+
 signal time_advanced(new_time: float)
 signal time_expired()
 signal rewind_completed
@@ -95,6 +98,18 @@ func create_snapshot() -> void:
 	if snapshots.size() > max_snapshots:
 		snapshots.pop_front()
 
+func create_event_snapshot(event_type: String, event_data: Dictionary = {}) -> void:
+	var snapshot = {
+		"time": simulation_time,
+		"event_type": event_type,
+		"event_data": event_data,
+		"game_state": _capture_game_state()
+	}
+	event_snapshots.append(snapshot)
+	
+	if event_snapshots.size() > max_event_snapshots:
+		event_snapshots.pop_front()
+
 func _capture_game_state() -> Dictionary:
 	var state = {}
 	var snapshotable_objects = get_tree().get_nodes_in_group("snapshotable")
@@ -140,11 +155,18 @@ func _find_snapshot_for_time(time: float) -> Dictionary:
 	var best_snapshot = {}
 	var best_time = -1.0
 	
-	for snapshot in snapshots:
+	for snapshot in event_snapshots:
 		var snapshot_time = snapshot.time
-		if snapshot_time <= time and snapshot_time > best_time:
+		if snapshot_time <= time && snapshot_time > best_time:
 			best_time = snapshot_time
 			best_snapshot = snapshot
+	
+	if best_time < 0:
+		for snapshot in snapshots:
+			var snapshot_time = snapshot.time
+			if snapshot_time <= time && snapshot_time > best_time:
+				best_time = snapshot_time
+				best_snapshot = snapshot
 	
 	return best_snapshot
 

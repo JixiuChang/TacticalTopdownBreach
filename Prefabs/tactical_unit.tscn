@@ -1,0 +1,9 @@
+[gd_scene format=3 uid="uid://bji4iyjcxo75i"]
+
+[node name="TacticalUnit" type="CharacterBody3D" unique_id=1102543427]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=348585398]
+
+[node name="NavigationAgent3D" type="NavigationAgent3D" parent="." unique_id=1988811400]
+
+[node name="CommandQueue" type="Node" parent="." unique_id=1380026371]

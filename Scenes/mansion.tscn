@@ -1,0 +1,69 @@
+[gd_scene format=3 uid="uid://chgo3ku6jjoq6"]
+
+[ext_resource type="Script" uid="uid://badcyrcxtguow" path="res://Scenes/mansion.gd" id="1_5jwi0"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_5jwi0"]
+size = Vector2(50, 50)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_exq5i"]
+albedo_color = Color(0.75, 0.75, 0.75, 1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_e6st1"]
+size = Vector3(50, 0.1, 50)
+
+[node name="Mansion" type="Node3D" unique_id=873741892]
+script = ExtResource("1_5jwi0")
+
+[node name="Environment" type="Node3D" parent="." unique_id=22614283]
+
+[node name="Static" type="Node3D" parent="Environment" unique_id=2075901415]
+
+[node name="Ground" type="StaticBody3D" parent="Environment/Static" unique_id=601288978]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Environment/Static/Ground" unique_id=2095334321]
+mesh = SubResource("PlaneMesh_5jwi0")
+surface_material_override/0 = SubResource("StandardMaterial3D_exq5i")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Environment/Static/Ground" unique_id=379734376]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+shape = SubResource("BoxShape3D_e6st1")
+
+[node name="Indestructable" type="Node3D" parent="Environment" unique_id=210362687]
+
+[node name="Destructable" type="Node3D" parent="Environment" unique_id=224182052]
+
+[node name="Objects" type="Node3D" parent="Environment" unique_id=887065220]
+
+[node name="Navigation" type="Node3D" parent="." unique_id=1440268829]
+
+[node name="NavigationRegion3D" type="NavigationRegion3D" parent="Navigation" unique_id=1531414847]
+
+[node name="Units" type="Node3D" parent="." unique_id=707165811]
+
+[node name="Spawns" type="Node3D" parent="." unique_id=166059651]
+
+[node name="PlayerSpawns" type="Node3D" parent="Spawns" unique_id=113018788]
+
+[node name="PSpawn1" type="Marker3D" parent="Spawns/PlayerSpawns" unique_id=1206866669]
+
+[node name="PSpawn2" type="Marker3D" parent="Spawns/PlayerSpawns" unique_id=1796979791]
+
+[node name="PSpawn3" type="Marker3D" parent="Spawns/PlayerSpawns" unique_id=278899599]
+
+[node name="PSpawn4" type="Marker3D" parent="Spawns/PlayerSpawns" unique_id=824330198]
+
+[node name="EnemySpawns" type="Node3D" parent="Spawns" unique_id=1374350159]
+
+[node name="ESpawn1" type="Marker3D" parent="Spawns/EnemySpawns" unique_id=880203185]
+
+[node name="Objective" type="Node3D" parent="." unique_id=693084614]
+
+[node name="ObjectiveMarker" type="Marker3D" parent="Objective" unique_id=1068874932]
+
+[node name="Lighting" type="Node3D" parent="." unique_id=1159494388]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 15, 0)
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="Lighting" unique_id=918483919]
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=1175485009]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0, 15, 0)
