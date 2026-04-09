@@ -21,6 +21,11 @@ TimeSimulator="*uid://dfk4m6x4lsjkh"
 PlayerKeybind="*res://Gameplay/Input/player_keybind.gd"
 InputRouter="*res://Gameplay/Input/input_router.gd"
 
+[display]
+
+window/stretch/mode="viewport"
+window/stretch/aspect="expand"
+
 [input]
 
 select_ground={
