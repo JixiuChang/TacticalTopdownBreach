@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://de08fwvuv6h67"]
 
 [ext_resource type="Script" uid="uid://d4k2vw7n8mcp1" path="res://UI/ingame_ui.gd" id="1_ui"]
+[ext_resource type="PackedScene" path="res://UI/Cursor/cursor.tscn" id="2_cursor"]
 
 [node name="IngameUi" type="Control" unique_id=107139758]
 layout_mode = 3
@@ -70,3 +71,5 @@ theme_override_constants/margin_bottom = 16
 custom_minimum_size = Vector2(64, 64)
 layout_mode = 2
 focus_mode = 0
+
+[node name="GameCursor" parent="." instance=ExtResource("2_cursor")]

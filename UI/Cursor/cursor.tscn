@@ -1,0 +1,24 @@
+[gd_scene format=3 uid="uid://cb0n8omrc3mm4"]
+
+[ext_resource type="Script" uid="uid://bieuqbq3tiv63" path="res://UI/Cursor/game_cursor.gd" id="1_cursor"]
+
+[node name="GameCursor" type="CanvasLayer" unique_id=762650224]
+layer = 100
+script = ExtResource("1_cursor")
+
+[node name="Follower" type="Control" parent="." unique_id=547290821]
+layout_mode = 3
+anchors_preset = 0
+mouse_filter = 2
+
+[node name="Inner" type="Control" parent="Follower" unique_id=1296428238]
+anchors_preset = 0
+mouse_filter = 2
+
+[node name="TextureRect" type="TextureRect" parent="Follower/Inner" unique_id=476258503]
+layout_mode = 0
+offset_right = 48.0
+offset_bottom = 48.0
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5

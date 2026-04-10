@@ -29,6 +29,33 @@ func _ready() -> void:
 	path_visualizer = get_node_or_null("/root/PathVisualizer")
 	if !path_visualizer:
 		path_visualizer = get_tree().get_first_node_in_group("path_visualizer")
+	
+	if not GameStateManager.phase_changed.is_connected(_on_game_phase_changed):
+		GameStateManager.phase_changed.connect(_on_game_phase_changed)
+
+func _on_game_phase_changed(new_phase: GameStateManager.GamePhase) -> void:
+	if new_phase != GameStateManager.GamePhase.EXECUTING:
+		return
+	if not is_dragging:
+		return
+	_cancel_active_path_drag()
+
+func _cancel_active_path_drag() -> void:
+	is_dragging = false
+	drag_start_position = Vector3.ZERO
+	drag_start_path_index = -1
+	current_drag_path.clear()
+	if not selected_unit:
+		return
+	var command_queue = selected_unit.get("command_queue")
+	if command_queue:
+		var current_command = command_queue.get_current_command()
+		if current_command and current_command is MoveCommand:
+			if path_visualizer and path_visualizer.has_method("visualize_path"):
+				path_visualizer.visualize_path(selected_unit, current_command.path)
+			return
+	if path_visualizer and path_visualizer.has_method("clear_path"):
+		path_visualizer.clear_path(selected_unit)
 
 func _input(event: InputEvent) -> void:
 	if not player_keybind: return
@@ -46,16 +73,36 @@ func _input(event: InputEvent) -> void:
 		GameStateManager.GamePhase.DEBRIEFING:
 			_handle_debrief_input(event)
 
+func _unhandled_input(event: InputEvent) -> void:
+	if not player_keybind:
+		return
+	if get_tree().get_first_node_in_group("briefing_blocks_input") != null:
+		return
+	
+	var current_phase = GameStateManager.get_phase()
+	match current_phase:
+		GameStateManager.GamePhase.PLANNING:
+			if event is InputEventMouseButton:
+				_handle_mouse_button(event)
+				var mb := event as InputEventMouseButton
+				if mb.button_index == MOUSE_BUTTON_LEFT:
+					get_viewport().set_input_as_handled()
+			elif event is InputEventMouseMotion:
+				_handle_mouse_motion(event)
+				if is_dragging:
+					get_viewport().set_input_as_handled()
+		GameStateManager.GamePhase.EXECUTING:
+			if event is InputEventMouseButton:
+				var mb2 := event as InputEventMouseButton
+				if mb2.button_index == MOUSE_BUTTON_LEFT:
+					get_viewport().set_input_as_handled()
+		_:
+			pass
+
 func _handle_planning_input(event: InputEvent) -> void:
 	if event.is_action_pressed(player_keybind.TOGGLE_EXECUTION_KEY):
 		GameStateManager.start_execution()
 		return
-	
-	# 处理鼠标输入
-	if event is InputEventMouseButton:
-		_handle_mouse_button(event)
-	elif event is InputEventMouseMotion:
-		_handle_mouse_motion(event)
 
 func _handle_mouse_button(event: InputEventMouseButton) -> void:
 	if event.button_index != MOUSE_BUTTON_LEFT:

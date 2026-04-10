@@ -25,8 +25,10 @@ enum FreecamToggle { ON, OFF }
 @export var top_down_arm: float = 22.0
 @export var top_down_ortho_size: float = 22.0
 ## Ortho frustum half-extent at startup `top_down_arm`; wheel changes arm and scales size so zoom is visible.
-## Top-down RMB: yaw only. Scale matches freecam MMB feel (~ orbit×0.01). Vertical sign depends on click vs screen center.
+## Top-down **middle** button: horizontal drag only (yaw). Vertical mouse motion ignored.
 @export var top_down_rmb_drag_scale: float = 0.01
+## Top-down **right** button pan on XZ like WASD (mouse up = same world delta as `camera_back`).
+@export var top_down_mmb_pan_mult: float = 0.02
 
 @export_group("Defaults: freecam (first toggle into mode / I key)")
 @export var freecam_default_position_xz: Vector2 = Vector2.ZERO
@@ -61,8 +63,6 @@ var _pitch: float = -35.0
 var _top_down_pitch_deg: float = -90.0
 var _rmb: bool = false
 var _mmb: bool = false
-## Top-down RMB press: click was left of viewport center (affects vertical-drag yaw sign).
-var _rmb_topdown_click_left_of_center: bool = false
 ## Baseline arm for pairing `top_down_ortho_size` with scroll-adjusted `top_down_arm` (ortho alone ignores depth).
 var _top_down_arm_ortho_ref: float = 22.0
 
@@ -93,22 +93,44 @@ func _physics_process(_delta: float) -> void:
 	global_position.y = camera_height
 
 
+## Forward (W / screen-up on the ground) and right (D / screen-right), both unit vectors on XZ from current camera pose.
+func _camera_planar_forward_right() -> Array:
+	var b := cam.global_transform.basis
+	var view_xz := Vector3(b.z.x, 0.0, b.z.z)
+	var forward: Vector3
+	# When look direction is nearly vertical (ortho top-down), `-Z` has no usable XZ projection — use camera +Y (top of viewport).
+	if view_xz.length_squared() > 1e-8:
+		forward = Vector3(-b.z.x, 0.0, -b.z.z).normalized()
+	else:
+		var up_on_screen := Vector3(b.y.x, 0.0, b.y.z)
+		if up_on_screen.length_squared() > 1e-8:
+			forward = up_on_screen.normalized()
+		else:
+			var yaw_basis := Basis.from_euler(Vector3(0.0, _yaw, 0.0))
+			var fz := Vector3(-yaw_basis.z.x, 0.0, -yaw_basis.z.z)
+			if fz.length_squared() > 1e-8:
+				forward = fz.normalized()
+			else:
+				forward = Vector3(0.0, 0.0, -1.0)
+	var right := Vector3(b.x.x, 0.0, b.x.z)
+	if right.length_squared() < 1e-8:
+		right = Vector3.UP.cross(forward)
+		if right.length_squared() < 1e-8:
+			right = Vector3(1.0, 0.0, 0.0)
+		else:
+			right = right.normalized()
+	else:
+		right = right.normalized()
+	return [forward, right]
+
+
 func _process(delta: float) -> void:
 	var ix := Input.get_axis(action_left, action_right)
 	var iz := Input.get_axis(action_fwd, action_back)
 	if absf(ix) > 0.001 or absf(iz) > 0.001:
-		var f := -cam.global_transform.basis.z
-		f.y = 0.0
-		if f.length_squared() < 1e-6:
-			f = Vector3(0.0, 0.0, -1.0)
-		else:
-			f = f.normalized()
-		var r := cam.global_transform.basis.x
-		r.y = 0.0
-		if r.length_squared() < 1e-6:
-			r = Vector3(1.0, 0.0, 0.0)
-		else:
-			r = r.normalized()
+		var fr := _camera_planar_forward_right()
+		var f: Vector3 = fr[0]
+		var r: Vector3 = fr[1]
 		global_position += (f * (-iz) + r * ix) * move_speed * delta
 
 
@@ -143,10 +165,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		match event.button_index:
 			MOUSE_BUTTON_RIGHT:
 				_rmb = event.pressed
-				if event.pressed and freecam_toggle == FreecamToggle.OFF:
-					var vr := get_viewport().get_visible_rect()
-					var center_x: float = vr.position.x + vr.size.x * 0.5
-					_rmb_topdown_click_left_of_center = event.position.x < center_x
 			MOUSE_BUTTON_MIDDLE:
 				_mmb = event.pressed
 			MOUSE_BUTTON_WHEEL_UP:
@@ -158,29 +176,32 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if event is InputEventMouseMotion:
 		var rel: Vector2 = event.relative
-		if _rmb:
-			if freecam_toggle == FreecamToggle.OFF:
+		if freecam_toggle == FreecamToggle.OFF:
+			if _rmb:
+				var fr_td := _camera_planar_forward_right()
+				var f_td: Vector3 = fr_td[0]
+				var r_td: Vector3 = fr_td[1]
+				# Same basis as WASD; horizontal drag sign inverted vs raw rel.x (grab-style pan).
+				global_position += (f_td * rel.y - r_td * rel.x) * top_down_mmb_pan_mult
+				get_viewport().set_input_as_handled()
+			elif _mmb:
 				var d := orbit_speed * top_down_rmb_drag_scale
-				# Mouse left → camera yaw clockwise (+Y from above / right-hand); mouse right → CCW.
-				# Vertical drag: if click was left of center, drag down turns camera CW (same as mouse-left);
-				# if click was right of center, drag down turns CCW (same as mouse-right).
-				var v_sign := -1.0 if _rmb_topdown_click_left_of_center else 1.0
-				_yaw += rel.x * d + v_sign * rel.y * d
+				_yaw += rel.x * d
 				_apply_top_down_camera()
 				get_viewport().set_input_as_handled()
-			else:
-				var sr := cam.global_transform.basis.x
-				var sf := Vector3(cam.global_transform.basis.z.x, 0.0, cam.global_transform.basis.z.z)
-				if sf.length_squared() > 1e-6:
-					sf = sf.normalized()
-				var pan := (-sr * rel.x - sf * rel.y) * pan_speed
-				global_position.x += pan.x
-				global_position.z += pan.z
-		elif _mmb and freecam_toggle == FreecamToggle.ON:
+		elif _rmb:
+			var sr := cam.global_transform.basis.x
+			var sf := Vector3(cam.global_transform.basis.z.x, 0.0, cam.global_transform.basis.z.z)
+			if sf.length_squared() > 1e-6:
+				sf = sf.normalized()
+			var pan := (-sr * rel.x - sf * rel.y) * pan_speed
+			global_position.x += pan.x
+			global_position.z += pan.z
+		elif _mmb:
 			var base := orbit_speed * 0.01
 			var dy_rad := rel.y * base * freecam_mmb_pitch_mult
 			var dx_rad := rel.x * base * freecam_mmb_yaw_mult
-			_yaw -= dx_rad
+			_yaw += dx_rad
 			_pitch = clampf(_pitch - rad_to_deg(dy_rad), pitch_min, pitch_max)
 			_update_free_camera()
 			get_viewport().set_input_as_handled()
