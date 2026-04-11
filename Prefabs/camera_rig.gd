@@ -3,7 +3,10 @@ extends Node3D
 
 enum FreecamToggle { ON, OFF }
 
-@export var camera_height: float = 15.0
+## World Y of the rig (horizontal pan plane / pivot height above ground at y=0).
+@export var camera_height: float = 2.0
+@export var camera_height_min: float = 0.2
+@export var camera_height_max: float = 8.0
 
 ## ON = perspective free camera; OFF = orthographic top-down.
 @export var freecam_toggle: FreecamToggle = FreecamToggle.ON
@@ -52,6 +55,9 @@ enum FreecamToggle { ON, OFF }
 @export var action_back: StringName = &"camera_back"
 @export var action_left: StringName = &"camera_left"
 @export var action_right: StringName = &"camera_right"
+@export var action_height_down: StringName = &"floorplan_down"
+@export var action_height_up: StringName = &"floorplan_up"
+@export var camera_height_adjust_speed: float = 3.0
 
 @onready var pivot: Node3D = $Pivot
 @onready var cam: Camera3D = $Pivot/Camera3D
@@ -84,13 +90,14 @@ var _td_ortho_ref: float
 
 func _ready() -> void:
 	cam.current = true
+	camera_height = clampf(camera_height, camera_height_min, camera_height_max)
 	_arm = clampf(_arm, arm_min_user, arm_max)
 	_top_down_arm_ortho_ref = top_down_arm
 	_apply_mode(true)
 
 
 func _physics_process(_delta: float) -> void:
-	global_position.y = camera_height
+	global_position.y = clampf(camera_height, camera_height_min, camera_height_max)
 
 
 ## Forward (W / screen-up on the ground) and right (D / screen-right), both unit vectors on XZ from current camera pose.
@@ -132,6 +139,13 @@ func _process(delta: float) -> void:
 		var f: Vector3 = fr[0]
 		var r: Vector3 = fr[1]
 		global_position += (f * (-iz) + r * ix) * move_speed * delta
+	var ih := Input.get_axis(action_height_down, action_height_up)
+	if absf(ih) > 0.001:
+		camera_height = clampf(
+			camera_height + ih * camera_height_adjust_speed * delta,
+			camera_height_min,
+			camera_height_max
+		)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -226,11 +240,11 @@ func _zoom_scroll(direction: int, scroll_factor: float = 1.0) -> void:
 
 
 func _min_zoom_cam_world_y() -> float:
-	return camera_height * 0.5
+	return camera_height_min
 
 
 func _max_zoom_cam_world_y() -> float:
-	return camera_height * 2.0
+	return camera_height_max
 
 
 ## Top-down only: arm clamped so camera world Y stays in [H/2, 2H]. Pivot must already be set for top-down.
@@ -257,8 +271,8 @@ func _clamp_top_down_arm_for_cam_height(arm_desired: float) -> float:
 		else:
 			arm = clampf(arm, t_lo, t_hi)
 	else:
-		var s_lo := maxf(geom_lo, camera_height * 0.5)
-		var s_hi := camera_height * 2.0
+		var s_lo := maxf(geom_lo, camera_height_min)
+		var s_hi := camera_height_max
 		arm = clampf(arm, s_lo, s_hi)
 	return arm
 

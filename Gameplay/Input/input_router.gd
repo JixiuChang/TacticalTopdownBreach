@@ -1,6 +1,7 @@
 # ~/Gameplay/Input/input_router.gd
 extends Node
 
+## Emitted with the selected unit, or `null` when selection is cleared.
 signal unit_selected(unit: Node)
 signal path_drawing_started(unit: Node, start_position: Vector3)
 signal path_drawing_updated(unit: Node, current_path: PackedVector3Array)
@@ -135,7 +136,10 @@ func _on_mouse_press(world_pos: Vector3, screen_pos: Vector2) -> void:
 	# 1. 检查是否点击了单位
 	var clicked_unit = _raycast_unit(screen_pos)
 	if clicked_unit:
-		_select_unit(clicked_unit)
+		if selected_unit == clicked_unit:
+			_deselect_unit()
+		else:
+			_select_unit(clicked_unit)
 		return
 	
 	# 2. 检查是否点击了路径
@@ -270,6 +274,18 @@ func _select_unit(unit: Node) -> void:
 	selected_unit = unit
 	unit_selected.emit(unit)
 
+
+func _deselect_unit() -> void:
+	if selected_unit == null:
+		return
+	if is_dragging:
+		_cancel_active_path_drag()
+	var u := selected_unit
+	selected_unit = null
+	if path_visualizer and path_visualizer.has_method("clear_path"):
+		path_visualizer.clear_path(u)
+	unit_selected.emit(null)
+
 func _raycast_unit(screen_pos: Vector2) -> Node:
 	var camera = get_viewport().get_camera_3d()
 	if not camera:
@@ -356,4 +372,4 @@ func get_selected_unit() -> Node:
 	return selected_unit
 
 func clear_selection() -> void:
-	selected_unit = null
+	_deselect_unit()

@@ -1,10 +1,10 @@
 [gd_scene format=3 uid="uid://cpwh3ykf8gao2"]
 
 [ext_resource type="Script" uid="uid://i8fou5ykqrvr" path="res://Scenes/test_scene.gd" id="1_3dogw"]
-[ext_resource type="Script" uid="uid://lxsfnq24m0b3" path="res://Gameplay/Units/tactical_unit.gd" id="2_r5l72"]
 [ext_resource type="Script" uid="uid://blhigdkw52tkt" path="res://Gameplay/Units/unit_navigation.gd" id="3_unav"]
 [ext_resource type="PackedScene" uid="uid://clc0spypx6a5" path="res://Prefabs/camera_rig.tscn" id="4_hb2xm"]
 [ext_resource type="PackedScene" uid="uid://de08fwvuv6h67" path="res://UI/ingame_ui.tscn" id="5_ingame_ui"]
+[ext_resource type="PackedScene" uid="uid://wmqfgb88rx38" path="res://UI/Path/click_indicator.tscn" id="6_click_ind"]
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_3dogw"]
 size = Vector2(10, 10)
@@ -25,7 +25,7 @@ script = ExtResource("3_unav")
 
 [node name="Static" type="Node3D" parent="Environment" unique_id=1275795175]
 
-[node name="Ground" type="StaticBody3D" parent="Environment/Static" unique_id=1279774792]
+[node name="Ground" type="StaticBody3D" parent="Environment/Static" unique_id=1279774792 groups=["debug_ground_click"]]
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Environment/Static/Ground" unique_id=185982017]
 mesh = SubResource("PlaneMesh_3dogw")
@@ -35,15 +35,12 @@ shape = SubResource("WorldBoundaryShape3D_r5l72")
 
 [node name="Units" type="Node3D" parent="." unique_id=1309603648]
 
-[node name="TacticalUnit" type="CharacterBody3D" parent="Units" unique_id=396735874]
-script = ExtResource("2_r5l72")
-metadata/_custom_type_script = "uid://lxsfnq24m0b3"
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Units/TacticalUnit" unique_id=1221601677]
-
 [node name="Lighting" type="Node3D" parent="." unique_id=989742970]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 15, 0)
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="Lighting" unique_id=237353844]
 
 [node name="CameraRig" parent="." unique_id=809345947 instance=ExtResource("4_hb2xm")]
+
+[node name="ClickIndicator" parent="." instance=ExtResource("6_click_ind")]
+visible = false

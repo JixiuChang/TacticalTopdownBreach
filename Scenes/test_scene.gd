@@ -9,12 +9,14 @@ extends Node3D
 @export_multiline var briefing_body: String = "This is a sandbox test map.\nYou can try UI flow, planning, and execution timing."
 
 const GROUP_BRIEFING_BLOCKS_INPUT: String = "briefing_blocks_input"
+const DEBUG_GROUND_GROUP: StringName = &"debug_ground_click"
 
 var tests_passed: int = 0
 var tests_failed: int = 0
 
 var _briefing_layer: CanvasLayer = null
 var _briefing_panel: Control = null
+@onready var _click_indicator: ClickIndicatorFX = $ClickIndicator
 
 func _ready() -> void:
 	if run_automated_tests:
@@ -24,6 +26,50 @@ func _ready() -> void:
 	GameStateManager.reset_gamestate()
 	await get_tree().process_frame
 	_build_briefing_ui()
+
+
+func _input(event: InputEvent) -> void:
+	if run_automated_tests:
+		return
+	if get_tree().get_first_node_in_group(GROUP_BRIEFING_BLOCKS_INPUT) != null:
+		return
+	if GameStateManager.get_phase() != GameStateManager.GamePhase.PLANNING:
+		return
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
+			_try_spawn_ui_click_indicator(mb.position)
+
+
+func _try_spawn_ui_click_indicator(screen_pos: Vector2) -> void:
+	var camera := get_viewport().get_camera_3d()
+	if camera == null:
+		return
+	var from := camera.project_ray_origin(screen_pos)
+	var to := from + camera.project_ray_normal(screen_pos) * 10_000.0
+	var q := PhysicsRayQueryParameters3D.create(from, to)
+	q.collision_mask = (1 << 0) | (1 << 1)
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	if hit.is_empty():
+		return
+	var collider: Object = hit["collider"]
+	if collider is CollisionObject3D:
+		var co := collider as CollisionObject3D
+		if co.collision_layer & (1 << 1) != 0:
+			return
+	if collider is Node and not _node_or_ancestor_in_ground_group(collider as Node):
+		return
+	if _click_indicator != null:
+		_click_indicator.play_at(hit["position"])
+
+
+func _node_or_ancestor_in_ground_group(n: Node) -> bool:
+	var p: Node = n
+	while p != null:
+		if p.is_in_group(DEBUG_GROUND_GROUP):
+			return true
+		p = p.get_parent()
+	return false
 
 
 func _unhandled_input(event: InputEvent) -> void:

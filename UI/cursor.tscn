@@ -1,0 +1,4 @@
+[gd_scene format=3 uid="uid://8weewycluise"]
+
+[node name="Cursor" type="Sprite2D" unique_id=1973097968]
+offset = Vector2(150, 180)

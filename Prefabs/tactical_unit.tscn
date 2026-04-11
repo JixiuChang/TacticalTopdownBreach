@@ -1,9 +1,33 @@
 [gd_scene format=3 uid="uid://bji4iyjcxo75i"]
 
-[node name="TacticalUnit" type="CharacterBody3D" unique_id=1102543427]
+[ext_resource type="Script" uid="uid://lxsfnq24m0b3" path="res://Gameplay/Units/tactical_unit.gd" id="1_unit"]
+[ext_resource type="Script" uid="uid://bkfmf62ytqo0i" path="res://Gameplay/Commands/command_queue.gd" id="2_cq"]
+[ext_resource type="PackedScene" uid="uid://i4sl1tjv3btt" path="res://UI/Path/path_indicator.tscn" id="3_path"]
+[ext_resource type="PackedScene" uid="uid://wmqfgb88rx38" path="res://UI/Path/click_indicator.tscn" id="4_click"]
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=348585398]
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_body"]
+height = 1.8
 
-[node name="NavigationAgent3D" type="NavigationAgent3D" parent="." unique_id=1988811400]
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
+radius = 0.4
+height = 0.8
 
-[node name="CommandQueue" type="Node" parent="." unique_id=1380026371]
+[node name="TacticalUnit" type="CharacterBody3D" unique_id=836350695]
+script = ExtResource("1_unit")
+
+[node name="BodyMesh" type="MeshInstance3D" parent="." unique_id=768531314]
+mesh = SubResource("CapsuleMesh_body")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=198663002]
+shape = SubResource("CapsuleShape3D_body")
+
+[node name="NavigationAgent3D" type="NavigationAgent3D" parent="." unique_id=1817713457]
+
+[node name="CommandQueue" type="Node" parent="." unique_id=1291057326]
+script = ExtResource("2_cq")
+
+[node name="PathIndicator" parent="." unique_id=710520527 instance=ExtResource("3_path")]
+visible = false
+
+[node name="ClickIndicator" parent="." unique_id=770945123 instance=ExtResource("4_click")]
+visible = false

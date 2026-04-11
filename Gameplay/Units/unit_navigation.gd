@@ -44,11 +44,11 @@ func _on_path_drawing_updated(unit: Node, current_path: PackedVector3Array) -> v
 
 func _on_path_drawing_finished(unit: Node, final_path: PackedVector3Array) -> void:
 	# 路径绘制完成，创建 MoveCommand
-	if !unit || !unit.has("command_queue"):
+	if unit == null or not ("command_queue" in unit):
 		return
 	
 	var command_queue = unit.get("command_queue")
-	if !command_queue:
+	if command_queue == null:
 		return
 	
 	# 如果从路径中间点开始编辑，需要删除后面的命令
@@ -79,11 +79,11 @@ func _on_path_drawing_finished(unit: Node, final_path: PackedVector3Array) -> vo
 
 func _on_unit_selected(unit: Node) -> void:
 	# 单位被选中，显示其当前路径
-	if !unit || !unit.has("command_queue"):
+	if unit == null or not ("command_queue" in unit):
 		return
 	
 	var command_queue = unit.get("command_queue")
-	if !command_queue:
+	if command_queue == null:
 		return
 	
 	var current_command = command_queue.get_current_command()

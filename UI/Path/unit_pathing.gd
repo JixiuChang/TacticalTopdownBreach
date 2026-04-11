@@ -8,12 +8,10 @@ extends Node3D
 # ============================================
 
 var path_lines: Dictionary = {}  # unit -> Line3D
-var path_points: Dictionary = {}  # unit -> Array[Node3D] (路径点标记)
 var path_time_labels: Dictionary = {}  # unit -> Label3D (时间标签)
 
 const PATH_COLOR: Color = Color.CYAN
 const PATH_WIDTH: float = 0.1
-const POINT_RADIUS: float = 0.2
 const TIME_LABEL_OFFSET: Vector3 = Vector3(0, 2, 0)
 
 func _ready() -> void:
@@ -26,9 +24,6 @@ func visualize_path(unit: Node, path: PackedVector3Array) -> void:
 	
 	# 创建或更新路径线
 	_create_path_line(unit, path)
-	
-	# 创建路径点标记
-	_create_path_points(unit, path)
 	
 	# 创建时间标签
 	_create_time_label(unit, path)
@@ -50,35 +45,6 @@ func _create_path_line(unit: Node, path: PackedVector3Array) -> void:
 	line.points = path
 	
 	path_lines[unit] = line
-
-func _create_path_points(unit: Node, path: PackedVector3Array) -> void:
-	# 移除旧的点
-	if path_points.has(unit):
-		for point in path_points[unit]:
-			if is_instance_valid(point):
-				point.queue_free()
-		path_points[unit].clear()
-	
-	# 创建新的路径点
-	var points = []
-	for i in range(path.size()):
-		var point_mesh = MeshInstance3D.new()
-		var sphere = SphereMesh.new()
-		sphere.radius = POINT_RADIUS
-		sphere.height = POINT_RADIUS * 2
-		point_mesh.mesh = sphere
-		
-		var material = StandardMaterial3D.new()
-		material.albedo_color = PATH_COLOR
-		point_mesh.material_override = material
-		
-		point_mesh.position = path[i]
-		point_mesh.name = "PathPoint_" + str(i)
-		add_child(point_mesh)
-		
-		points.append(point_mesh)
-	
-	path_points[unit] = points
 
 func _create_time_label(unit: Node, path: PackedVector3Array) -> void:
 	# 移除旧的时间标签
@@ -132,12 +98,6 @@ func clear_path(unit: Node) -> void:
 		if is_instance_valid(line):
 			line.queue_free()
 		path_lines.erase(unit)
-	
-	if path_points.has(unit):
-		for point in path_points[unit]:
-			if is_instance_valid(point):
-				point.queue_free()
-		path_points.erase(unit)
 	
 	if path_time_labels.has(unit):
 		var label = path_time_labels[unit]
