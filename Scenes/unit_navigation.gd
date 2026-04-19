@@ -1,4 +1,4 @@
-# ~/Gameplay/Units/unit_navigation.gd
+# res://Scenes/unit_navigation.gd
 class_name UnitNavigation
 extends Node
 

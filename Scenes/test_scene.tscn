@@ -1,18 +1,29 @@
 [gd_scene format=3 uid="uid://cpwh3ykf8gao2"]
 
 [ext_resource type="Script" uid="uid://i8fou5ykqrvr" path="res://Scenes/test_scene.gd" id="1_3dogw"]
-[ext_resource type="Script" uid="uid://blhigdkw52tkt" path="res://Gameplay/Units/unit_navigation.gd" id="3_unav"]
-[ext_resource type="PackedScene" uid="uid://clc0spypx6a5" path="res://Prefabs/camera_rig.tscn" id="4_hb2xm"]
+[ext_resource type="Script" path="res://Gameplay/Units/unit_navigation.gd" id="3_unav"]
+[ext_resource type="PackedScene" uid="uid://b704cifngsb7j" path="res://Prefabs/camera_map.tscn" id="4_hb2xm"]
 [ext_resource type="PackedScene" uid="uid://de08fwvuv6h67" path="res://UI/ingame_ui.tscn" id="5_ingame_ui"]
 [ext_resource type="PackedScene" uid="uid://wmqfgb88rx38" path="res://UI/Path/click_indicator.tscn" id="6_click_ind"]
 
-[sub_resource type="PlaneMesh" id="PlaneMesh_3dogw"]
-size = Vector2(10, 10)
+[sub_resource type="Environment" id="Environment_flatlit"]
+background_mode = 1
+background_color = Color(0.45, 0.47, 0.5, 1)
+ambient_light_source = 2
+ambient_light_color = Color(1, 1, 1, 1)
+ambient_light_energy = 1.35
 
-[sub_resource type="WorldBoundaryShape3D" id="WorldBoundaryShape3D_r5l72"]
+[sub_resource type="PlaneMesh" id="PlaneMesh_3dogw"]
+size = Vector2(20, 20)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ground"]
+size = Vector3(20, 0.1, 20)
 
 [node name="TestScene" type="Node3D" unique_id=2111420194]
 script = ExtResource("1_3dogw")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=777000001]
+environment = SubResource("Environment_flatlit")
 
 [node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=500001]
 
@@ -31,7 +42,8 @@ script = ExtResource("3_unav")
 mesh = SubResource("PlaneMesh_3dogw")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Environment/Static/Ground" unique_id=907365447]
-shape = SubResource("WorldBoundaryShape3D_r5l72")
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
+shape = SubResource("BoxShape3D_ground")
 
 [node name="Units" type="Node3D" parent="." unique_id=1309603648]
 
@@ -39,8 +51,9 @@ shape = SubResource("WorldBoundaryShape3D_r5l72")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 15, 0)
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="Lighting" unique_id=237353844]
+light_energy = 1.05
 
-[node name="CameraRig" parent="." unique_id=809345947 instance=ExtResource("4_hb2xm")]
+[node name="CameraMap" parent="." unique_id=809345947 instance=ExtResource("4_hb2xm")]
 
-[node name="ClickIndicator" parent="." instance=ExtResource("6_click_ind")]
+[node name="ClickIndicator" parent="." unique_id=1013048063 instance=ExtResource("6_click_ind")]
 visible = false

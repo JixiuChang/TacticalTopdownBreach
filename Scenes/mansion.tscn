@@ -11,8 +11,18 @@ albedo_color = Color(0.75, 0.75, 0.75, 1)
 [sub_resource type="BoxShape3D" id="BoxShape3D_e6st1"]
 size = Vector3(50, 0.1, 50)
 
+[sub_resource type="Environment" id="Environment_flatlit_mansion"]
+background_mode = 1
+background_color = Color(0.45, 0.47, 0.5, 1)
+ambient_light_source = 2
+ambient_light_color = Color(1, 1, 1, 1)
+ambient_light_energy = 1.35
+
 [node name="Mansion" type="Node3D" unique_id=873741892]
 script = ExtResource("1_5jwi0")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=777000002]
+environment = SubResource("Environment_flatlit_mansion")
 
 [node name="Environment" type="Node3D" parent="." unique_id=22614283]
 
@@ -64,6 +74,8 @@ shape = SubResource("BoxShape3D_e6st1")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 15, 0)
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="Lighting" unique_id=918483919]
+light_energy = 1.05
+shadow_enabled = false
 
 [node name="Camera3D" type="Camera3D" parent="." unique_id=1175485009]
 transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0, 15, 0)

@@ -1,5 +1,6 @@
 # res://UI/Cursor/game_cursor.gd
 ## Custom in-game cursor: texture + hover/selection visuals. Click routing is handled elsewhere.
+class_name GameCursor
 extends CanvasLayer
 
 const GROUP_INTERACTIBLE := &"cursor_interactible"
@@ -13,7 +14,7 @@ const TEX_HAND_POINT := preload("res://Assets/Cursor/hand_point.png")
 @export var ray_collision_mask: int = 1 | 2
 @export var ray_length: float = 4096.0
 
-@export var hotspot_pointer: Vector2 = Vector2(4.0, 4.0)
+@export var hotspot_pointer: Vector2 = Vector2(29.0, 23.0)
 @export var hotspot_hand: Vector2 = Vector2(16.0, 8.0)
 ## Uniform scale for drawn cursor vs source art (hotspot uses the same factor for alignment).
 @export var cursor_base_scale: float = 0.5
@@ -154,8 +155,10 @@ func _raycast_cursor(screen_pos: Vector2) -> Dictionary:
 	var cam := get_viewport().get_camera_3d()
 	if cam == null:
 		return {}
-	var from := cam.project_ray_origin(screen_pos)
-	var to := from + cam.project_ray_normal(screen_pos) * ray_length
+	var ray := CameraScreenRay.world_ray_for_pick(cam, screen_pos)
+	var from: Vector3 = ray["origin"]
+	var dir: Vector3 = ray["dir"]
+	var to := from + dir * ray_length
 	var space := get_viewport().get_world_3d().direct_space_state
 	var q := PhysicsRayQueryParameters3D.create(from, to)
 	q.collision_mask = ray_collision_mask

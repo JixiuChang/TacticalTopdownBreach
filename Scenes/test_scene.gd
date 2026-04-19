@@ -26,41 +26,30 @@ func _ready() -> void:
 	GameStateManager.reset_gamestate()
 	await get_tree().process_frame
 	_build_briefing_ui()
+	if not run_automated_tests:
+		_connect_ground_click_indicator()
 
 
-func _input(event: InputEvent) -> void:
+func _connect_ground_click_indicator() -> void:
+	var router := get_node_or_null("/root/InputRouter")
+	if router == null:
+		return
+	if router.planning_ground_pick.is_connected(_on_router_planning_ground_pick):
+		return
+	router.planning_ground_pick.connect(_on_router_planning_ground_pick)
+
+
+func _on_router_planning_ground_pick(hit_position: Vector3, collider: Object) -> void:
 	if run_automated_tests:
 		return
 	if get_tree().get_first_node_in_group(GROUP_BRIEFING_BLOCKS_INPUT) != null:
 		return
 	if GameStateManager.get_phase() != GameStateManager.GamePhase.PLANNING:
 		return
-	if event is InputEventMouseButton:
-		var mb := event as InputEventMouseButton
-		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
-			_try_spawn_ui_click_indicator(mb.position)
-
-
-func _try_spawn_ui_click_indicator(screen_pos: Vector2) -> void:
-	var camera := get_viewport().get_camera_3d()
-	if camera == null:
-		return
-	var from := camera.project_ray_origin(screen_pos)
-	var to := from + camera.project_ray_normal(screen_pos) * 10_000.0
-	var q := PhysicsRayQueryParameters3D.create(from, to)
-	q.collision_mask = (1 << 0) | (1 << 1)
-	var hit := get_world_3d().direct_space_state.intersect_ray(q)
-	if hit.is_empty():
-		return
-	var collider: Object = hit["collider"]
-	if collider is CollisionObject3D:
-		var co := collider as CollisionObject3D
-		if co.collision_layer & (1 << 1) != 0:
-			return
 	if collider is Node and not _node_or_ancestor_in_ground_group(collider as Node):
 		return
 	if _click_indicator != null:
-		_click_indicator.play_at(hit["position"])
+		_click_indicator.play_at(hit_position)
 
 
 func _node_or_ancestor_in_ground_group(n: Node) -> bool:

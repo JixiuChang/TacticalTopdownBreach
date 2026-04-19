@@ -1,4 +1,4 @@
-# ~/Gameplay/Units/tactical_unit.gd
+# res://Prefabs/tactical_unit.gd
 class_name TacticalUnit
 extends CharacterBody3D
 
@@ -18,6 +18,9 @@ var current_height: float = 1.8
 var command_queue: CommandQueue = null
 @export var footstep_sound: AudioStreamPlayer3D = null
 
+## Tint for the child `ClickIndicator` (unshaded). Set from spawn slots later, or per-instance in the inspector.
+@export var click_indicator_color: Color = Color.WHITE
+
 func _ready() -> void:
 	add_to_group("units")
 	add_to_group("snapshotable")
@@ -36,6 +39,18 @@ func _ready() -> void:
 	_setup_collision()
 	_setup_navigation_agent()
 	set_height(MovementEnums.get_stance_height(current_stance))
+	_apply_click_indicator_color()
+
+
+func set_click_indicator_color(c: Color) -> void:
+	click_indicator_color = c
+	_apply_click_indicator_color()
+
+
+func _apply_click_indicator_color() -> void:
+	var ci := get_node_or_null("ClickIndicator") as ClickIndicatorFX
+	if ci != null:
+		ci.set_surface_color(click_indicator_color)
 
 
 func _capsule_shape_middle_height(full_height: float, radius: float) -> float:

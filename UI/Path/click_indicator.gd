@@ -5,17 +5,29 @@ extends Node3D
 @onready var dot: Node3D = $Dot
 
 const DURATION_SEC := 1.0
-const LIGHT_BLUE := Color(0.68, 0.88, 1.0, 1.0)
+
+## Unshaded mesh tint. Default pure white for “neutral” ground clicks; tactical units override via `set_surface_color`.
+var _surface_color: Color = Color.WHITE
 
 var _time: float = 0.0
 
 
 func _ready() -> void:
 	scale = Vector3(0.25, 0.25, 0.25)
-	_apply_light_blue_recursive(ring)
-	_apply_light_blue_recursive(dot)
+	_apply_surface_color_recursive(ring, _surface_color)
+	_apply_surface_color_recursive(dot, _surface_color)
 	_apply_idle_visual_state()
 	set_process(false)
+
+
+func set_surface_color(c: Color) -> void:
+	_surface_color = c
+	if !is_inside_tree():
+		return
+	if is_instance_valid(ring):
+		_apply_surface_color_recursive(ring, _surface_color)
+	if is_instance_valid(dot):
+		_apply_surface_color_recursive(dot, _surface_color)
 
 
 func _apply_idle_visual_state() -> void:
@@ -27,7 +39,11 @@ func _apply_idle_visual_state() -> void:
 
 ## Move to `world_pos` and replay ring shrink; dot stays visible after animation.
 func play_at(world_pos: Vector3) -> void:
+	rotation_degrees = Vector3(-90, 0, 0)
 	global_position = world_pos
+	# GLB mesh origins are often not at the root; snap so the dot's world center matches the hit point.
+	if is_instance_valid(dot):
+		global_position += world_pos - dot.global_position
 	visible = true
 	_time = 0.0
 	dot.visible = true
@@ -37,15 +53,15 @@ func play_at(world_pos: Vector3) -> void:
 	set_process(true)
 
 
-func _apply_light_blue_recursive(n: Node) -> void:
+func _apply_surface_color_recursive(n: Node, color: Color) -> void:
 	if n is MeshInstance3D:
 		var mi := n as MeshInstance3D
 		var m := StandardMaterial3D.new()
-		m.albedo_color = LIGHT_BLUE
+		m.albedo_color = color
 		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		mi.material_override = m
 	for child in n.get_children():
-		_apply_light_blue_recursive(child)
+		_apply_surface_color_recursive(child, color)
 
 
 func _process(delta: float) -> void:

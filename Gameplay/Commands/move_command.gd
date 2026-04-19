@@ -44,6 +44,21 @@ func _init(
 	else:
 		duration = 0.0
 
+
+func set_path(p: PackedVector3Array) -> void:
+	path = p
+	current_index = 0
+	elapsed_time = 0.0
+	last_footstep_time = 0.0
+	if path.size() > 1:
+		var total_distance := 0.0
+		for i in range(path.size() - 1):
+			total_distance += path[i].distance_to(path[i + 1])
+		duration = total_distance / calculated_speed if calculated_speed > 0.0 else 0.0
+	else:
+		duration = 0.0
+
+
 func execute(unit: Node, delta: float) -> void:
 	if completed || cancelled || path.is_empty():
 		return

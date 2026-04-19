@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://bji4iyjcxo75i"]
 
-[ext_resource type="Script" uid="uid://lxsfnq24m0b3" path="res://Gameplay/Units/tactical_unit.gd" id="1_unit"]
+[ext_resource type="Script" path="res://Gameplay/Units/tactical_unit.gd" id="1_unit"]
 [ext_resource type="Script" uid="uid://bkfmf62ytqo0i" path="res://Gameplay/Commands/command_queue.gd" id="2_cq"]
 [ext_resource type="PackedScene" uid="uid://i4sl1tjv3btt" path="res://UI/Path/path_indicator.tscn" id="3_path"]
 [ext_resource type="PackedScene" uid="uid://wmqfgb88rx38" path="res://UI/Path/click_indicator.tscn" id="4_click"]

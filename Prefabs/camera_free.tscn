@@ -1,0 +1,12 @@
+[gd_scene format=3 uid="uid://c8freecam01"]
+
+[ext_resource type="Script" path="res://Prefabs/camera_free.gd" id="1_free"]
+
+[node name="CameraFree" type="Node3D"]
+script = ExtResource("1_free")
+
+[node name="Location" type="Node3D" parent="."]
+
+[node name="Pivot" type="Node3D" parent="."]
+
+[node name="Camera3D" type="Camera3D" parent="Pivot"]
