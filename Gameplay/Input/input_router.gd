@@ -5,6 +5,7 @@ extends Node
 signal unit_selected(unit: Node)
 ## PLANNING + LMB: same ground pick as `_screen_to_world` / path start. UI clicks never reach here.
 signal planning_ground_pick(hit_position: Vector3, collider: Object)
+signal interactable_clicked(interactable: Node, selected_unit: Node, hit_position: Vector3)
 signal path_drawing_started(unit: Node, start_position: Vector3)
 signal path_drawing_updated(unit: Node, current_path: PackedVector3Array)
 signal path_drawing_finished(unit: Node, final_path: PackedVector3Array)
@@ -31,6 +32,9 @@ var path_visualizer: Node = null
 const _GROUND_FORWARD_LEN := 10_000.0
 const _VERT_PROBE_UP := 512.0
 const _VERT_PROBE_DOWN := 1024.0
+const _GROUND_CLICK_GROUP: StringName = &"debug_ground_click"
+const _INTERACTIBLE_GROUP: StringName = &"cursor_interactible"
+const _PATH_ENDPOINT_BLOCK_MASK: int = 1 | 2
 
 ## 拖拽采样：相邻关键点最小世界距离（防止点过密）。
 @export var keypoint_min_distance: float = 0.22
@@ -40,6 +44,7 @@ const _VERT_PROBE_DOWN := 1024.0
 @export var path_trim_max_screen_drag_px: float = 14.0
 ## 垂直差大于此且场景存在组 `stair_path_bridge` 的节点且实现 `plan_stair_path(from,to)->PackedVector3Array` 时走楼梯桥；否则退回导航网格。
 @export var stair_height_threshold: float = 0.45
+@export var max_drag_keypoints: int = 96
 
 var _drag_screen_accum: float = 0.0
 var _pending_path_trim: Dictionary = {}
@@ -128,6 +133,12 @@ func _unhandled_input(event: InputEvent) -> void:
 				var mb2 := event as InputEventMouseButton
 				if mb2.button_index == MOUSE_BUTTON_LEFT:
 					get_viewport().set_input_as_handled()
+		GameStateManager.GamePhase.BRIEFING, GameStateManager.GamePhase.DEBRIEFING:
+			if event is InputEventMouseButton:
+				_handle_mouse_button(event)
+				var mb3 := event as InputEventMouseButton
+				if mb3.button_index == MOUSE_BUTTON_LEFT:
+					get_viewport().set_input_as_handled()
 		_:
 			pass
 
@@ -139,46 +150,51 @@ func _handle_planning_input(event: InputEvent) -> void:
 func _handle_mouse_button(event: InputEventMouseButton) -> void:
 	if event.button_index != MOUSE_BUTTON_LEFT:
 		return
+	var phase := GameStateManager.get_phase()
+	if phase == GameStateManager.GamePhase.EXECUTING:
+		return
 	
 	# 与 NAD-LAB 示例一致：用视口当前鼠标像素（与 `get_mouse_position()` 同源），避免与自定义光标帧不同步。
 	var mouse_pos := get_viewport().get_mouse_position()
 	var ground_hit := _raycast_ground(mouse_pos)
 	var world_position := Vector3.ZERO
+	var has_ground_hit := not ground_hit.is_empty()
 	if not ground_hit.is_empty():
 		world_position = ground_hit["position"]
 	
-	if event.pressed and not ground_hit.is_empty():
-		planning_ground_pick.emit(ground_hit["position"], ground_hit["collider"])
-	
 	if event.pressed:
-		_on_mouse_press(world_position, mouse_pos)
+		var consumed := _on_mouse_press(world_position, mouse_pos, phase, has_ground_hit)
+		if not consumed and has_ground_hit:
+			planning_ground_pick.emit(ground_hit["position"], ground_hit["collider"])
 	else:
-		_on_mouse_release(world_position, mouse_pos)
+		_on_mouse_release(world_position, mouse_pos, phase)
 
 func _handle_mouse_motion(event: InputEventMouseMotion) -> void:
-	if !is_dragging:
-		return
-	
-	_drag_screen_accum += event.relative.length()
-	var mouse_pos := get_viewport().get_mouse_position()
-	var world_position = _screen_to_world(mouse_pos)
-	
-	if world_position == Vector3.ZERO:
-		return
-	
-	# 更新拖拽路径
-	_update_drag_path(world_position)
+	return
 
-func _on_mouse_press(world_pos: Vector3, screen_pos: Vector2) -> void:
+func _on_mouse_press(world_pos: Vector3, screen_pos: Vector2, phase: GameStateManager.GamePhase, has_ground_hit: bool) -> bool:
 	var clicked_unit := _raycast_unit(screen_pos)
 	if clicked_unit:
 		_pending_path_trim.clear()
 		_path_click_screen_accum = 0.0
-		if selected_unit == clicked_unit:
-			_deselect_unit()
-		else:
-			_select_unit(clicked_unit)
-		return
+		if phase == GameStateManager.GamePhase.PLANNING:
+			if selected_unit == clicked_unit:
+				_deselect_unit()
+			else:
+				_select_unit(clicked_unit)
+		return true
+
+	var interact_hit := _raycast_interactable(screen_pos)
+	if not interact_hit.is_empty():
+		var interact_node: Variant = interact_hit.get("collider")
+		if interact_node is Node:
+			var hit_pos_v: Variant = interact_hit.get("position", world_pos)
+			var hit_pos: Vector3 = hit_pos_v if hit_pos_v is Vector3 else world_pos
+			interactable_clicked.emit(interact_node as Node, selected_unit, hit_pos)
+			return true
+
+	if phase != GameStateManager.GamePhase.PLANNING:
+		return false
 	
 	if selected_unit:
 		var path_click_result := _check_path_click(selected_unit, screen_pos)
@@ -190,14 +206,19 @@ func _on_mouse_press(world_pos: Vector3, screen_pos: Vector2) -> void:
 				"path_index": path_click_result.path_index,
 			}
 			_path_click_screen_accum = 0.0
-			return
+			return true
 	
 	if selected_unit:
 		_pending_path_trim.clear()
 		_path_click_screen_accum = 0.0
-		_start_new_path_drag(selected_unit, world_pos)
+		if has_ground_hit:
+			_request_click_endpoint(selected_unit, world_pos)
+			return true
+	return false
 
-func _on_mouse_release(world_pos: Vector3, screen_pos: Vector2) -> void:
+func _on_mouse_release(world_pos: Vector3, screen_pos: Vector2, phase: GameStateManager.GamePhase) -> void:
+	if phase != GameStateManager.GamePhase.PLANNING:
+		return
 	if not _pending_path_trim.is_empty():
 		var u: Node = _pending_path_trim.get("unit") as Node
 		var idx: int = int(_pending_path_trim.get("path_index", -1))
@@ -210,6 +231,22 @@ func _on_mouse_release(world_pos: Vector3, screen_pos: Vector2) -> void:
 	if not is_dragging:
 		return
 	_finish_path_drag(world_pos)
+
+
+func _request_click_endpoint(unit: Node, world_pos: Vector3) -> void:
+	if unit == null:
+		return
+	# Click-only endpoint workflow: one click means one new endpoint request.
+	is_dragging = false
+	drag_start_position = Vector3.ZERO
+	drag_start_path_index = -1
+	_drag_screen_accum = 0.0
+	var start := _endpoint_world(unit)
+	current_drag_path = PackedVector3Array([start, world_pos])
+	if unit.has_method("play_click_indicator_at"):
+		unit.call("play_click_indicator_at", world_pos)
+	print("Endpoint set requested for unit ", unit.name, ": ", world_pos)
+	path_drawing_finished.emit(unit, current_drag_path)
 
 func _start_new_path_drag(unit: Node, start_pos: Vector3) -> void:
 	selected_unit = unit
@@ -228,9 +265,14 @@ func _update_drag_path(world_pos: Vector3) -> void:
 	if not selected_unit or current_drag_path.is_empty():
 		return
 	var last_point: Vector3 = current_drag_path[current_drag_path.size() - 1]
-	if last_point.distance_to(world_pos) < keypoint_min_distance:
+	var dist := last_point.distance_to(world_pos)
+	if dist < keypoint_min_distance:
+		current_drag_path[current_drag_path.size() - 1] = world_pos
 		return
-	current_drag_path.append(world_pos)
+	if current_drag_path.size() >= max_drag_keypoints:
+		current_drag_path[current_drag_path.size() - 1] = world_pos
+	else:
+		current_drag_path.append(world_pos)
 	path_drawing_updated.emit(selected_unit, current_drag_path)
 
 func _finish_path_drag(world_pos: Vector3) -> void:
@@ -238,12 +280,8 @@ func _finish_path_drag(world_pos: Vector3) -> void:
 		return
 	if current_drag_path.is_empty():
 		current_drag_path.append(_endpoint_world(selected_unit))
-	if _drag_screen_accum <= ground_click_max_screen_drag_px and current_drag_path.size() == 1:
-		await _merge_endpoint_via_planner(selected_unit, world_pos)
-	else:
-		var last_point: Vector3 = current_drag_path[current_drag_path.size() - 1]
-		if last_point.distance_to(world_pos) > 0.08:
-			current_drag_path.append(world_pos)
+	# Click-only endpoint update: endpoint is set by click-down position, not cursor dragging.
+	await _merge_endpoint_via_planner(selected_unit, drag_start_position)
 	path_drawing_finished.emit(selected_unit, current_drag_path)
 	
 	is_dragging = false
@@ -286,11 +324,51 @@ func _raycast_unit(screen_pos: Vector2) -> Node:
 	var query = PhysicsRayQueryParameters3D.create(from, to)
 	query.collision_mask = 2  # 单位层
 	
-	var result = space_state.intersect_ray(query)
-	if result && result.collider.has_method("is_unit"):
-		return result.collider
+	var result: Dictionary = space_state.intersect_ray(query)
+	if result.is_empty():
+		return null
+	var hit_collider: Variant = result.get("collider")
+	var resolved := _resolve_unit_from_hit(hit_collider)
+	if resolved != null:
+		return resolved
 	
 	return null
+
+
+func _resolve_unit_from_hit(hit: Variant) -> Node:
+	if not (hit is Node):
+		return null
+	var n: Node = hit as Node
+	while n != null:
+		if n.has_method(&"is_unit") and bool(n.call(&"is_unit")):
+			return n
+		n = n.get_parent()
+	return null
+
+
+func _raycast_interactable(screen_pos: Vector2) -> Dictionary:
+	var camera = get_viewport().get_camera_3d()
+	if not camera:
+		return {}
+	var ray := CameraScreenRay.world_ray_for_pick(camera, screen_pos)
+	var from: Vector3 = ray["origin"]
+	var dir: Vector3 = ray["dir"]
+	var to := from + dir * _GROUND_FORWARD_LEN
+	var space_state = get_viewport().get_world_3d().direct_space_state
+	var query := PhysicsRayQueryParameters3D.create(from, to)
+	query.collision_mask = _PATH_ENDPOINT_BLOCK_MASK
+	var result := space_state.intersect_ray(query)
+	if result.is_empty():
+		return {}
+	var c : Variant = result.get("collider")
+	if not (c is Node):
+		return {}
+	var n: Node = c as Node
+	while n != null:
+		if n.is_in_group(_INTERACTIBLE_GROUP):
+			return result
+		n = n.get_parent()
+	return {}
 
 func _check_path_click(unit: Node, screen_pos: Vector2) -> Dictionary:
 	# 检查是否点击了路径（用于选择单位）
@@ -386,6 +464,17 @@ func _clamp_ground_pick_xz(p: Vector3, plane_y: float) -> Vector3:
 	return p
 
 
+func _is_ground_hit_collider(collider: Variant) -> bool:
+	if not (collider is Node):
+		return false
+	var p: Node = collider as Node
+	while p != null:
+		if p.is_in_group(_GROUND_CLICK_GROUP):
+			return true
+		p = p.get_parent()
+	return false
+
+
 func _resolve_ground_plane_y() -> float:
 	var cam := get_viewport().get_camera_3d()
 	if cam == null:
@@ -413,7 +502,25 @@ func _raycast_ground(screen_pos: Vector2) -> Dictionary:
 	var space_state := get_viewport().get_world_3d().direct_space_state
 	var plane_y := _resolve_ground_plane_y()
 
+	# First visible hit decides endpoint validity; do not project through blockers.
+	var first_query := PhysicsRayQueryParameters3D.create(from, from + dir * _GROUND_FORWARD_LEN)
+	first_query.collision_mask = _PATH_ENDPOINT_BLOCK_MASK
+	var first_hit := space_state.intersect_ray(first_query)
+	if not first_hit.is_empty():
+		if not _is_ground_hit_collider(first_hit.get("collider")):
+			return {}
+		var p_first: Vector3 = first_hit["position"]
+		p_first = _clamp_ground_pick_xz(p_first, plane_y)
+		return {
+			"position": p_first,
+			"collider": first_hit.get("collider"),
+			"normal": first_hit.get("normal", Vector3.UP),
+		}
+
 	var forward_hit := _raycast_ground_physics_forward(from, dir, space_state)
+	if not forward_hit.is_empty():
+		if not _is_ground_hit_collider(forward_hit.get("collider")):
+			forward_hit = {}
 	if not forward_hit.is_empty():
 		var p: Vector3 = forward_hit["position"]
 		p = _clamp_ground_pick_xz(p, plane_y)
@@ -433,7 +540,7 @@ func _raycast_ground(screen_pos: Vector2) -> Dictionary:
 			var pq := PhysicsRayQueryParameters3D.create(probe_from, probe_to)
 			pq.collision_mask = 1
 			var probe := space_state.intersect_ray(pq)
-			if not probe.is_empty():
+			if not probe.is_empty() and _is_ground_hit_collider(probe.get("collider")):
 				return {
 					"position": snapped,
 					"collider": probe["collider"],

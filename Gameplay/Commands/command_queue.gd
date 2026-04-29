@@ -73,6 +73,8 @@ func add_command(command: Command) -> void:
 
 func clear_commands() -> void:
 	for command in commands:
+		if command is MoveCommand and unit != null and unit.has_method("stop_path_indicator"):
+			unit.call("stop_path_indicator")
 		command.cancel()
 	commands.clear()
 
@@ -80,6 +82,8 @@ func cancel_current_command() -> void:
 	if commands.is_empty(): return
 	
 	var current_command = commands[0]
+	if current_command is MoveCommand and unit != null and unit.has_method("stop_path_indicator"):
+		unit.call("stop_path_indicator")
 	current_command.cancel()
 	commands.pop_front()
 	

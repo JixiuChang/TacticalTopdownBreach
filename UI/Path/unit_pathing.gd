@@ -11,7 +11,8 @@ var path_lines: Dictionary = {}  # unit -> Line3D
 var path_time_labels: Dictionary = {}  # unit -> Label3D (时间标签)
 
 const PATH_COLOR: Color = Color.CYAN
-const PATH_WIDTH: float = 0.1
+const PATH_WIDTH: float = 0.16
+const PATH_Y_LIFT: float = 0.06
 const TIME_LABEL_OFFSET: Vector3 = Vector3(0, 2, 0)
 
 func _ready() -> void:
@@ -41,8 +42,12 @@ func _create_path_line(unit: Node, path: PackedVector3Array) -> void:
 	add_child(line)
 	
 	line.width = PATH_WIDTH
-	line.default_color = PATH_COLOR
-	line.points = path
+	var c: Variant = unit.get("click_indicator_color")
+	line.default_color = c if c is Color else PATH_COLOR
+	var lifted := PackedVector3Array()
+	for p in path:
+		lifted.append(Vector3(p.x, p.y + PATH_Y_LIFT, p.z))
+	line.points = lifted
 	
 	path_lines[unit] = line
 

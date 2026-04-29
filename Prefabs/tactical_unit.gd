@@ -40,6 +40,7 @@ func _ready() -> void:
 	_setup_navigation_agent()
 	set_height(MovementEnums.get_stance_height(current_stance))
 	_apply_click_indicator_color()
+	_init_unit_click_indicator_anchor()
 
 
 func set_click_indicator_color(c: Color) -> void:
@@ -51,6 +52,44 @@ func _apply_click_indicator_color() -> void:
 	var ci := get_node_or_null("ClickIndicator") as ClickIndicatorFX
 	if ci != null:
 		ci.set_surface_color(click_indicator_color)
+	var pi := get_node_or_null("PathIndicator") as PathIndicatorFX
+	if pi != null:
+		pi.set_surface_color(click_indicator_color)
+
+
+func _init_unit_click_indicator_anchor() -> void:
+	var ci := get_node_or_null("ClickIndicator") as ClickIndicatorFX
+	if ci == null:
+		return
+	ci.set_idle_at(global_position)
+
+
+func play_click_indicator_at(world_pos: Vector3) -> void:
+	var ci := get_node_or_null("ClickIndicator") as ClickIndicatorFX
+	if ci == null:
+		return
+	ci.play_at(world_pos)
+
+
+func play_path_indicator(path: PackedVector3Array) -> void:
+	var pi := get_node_or_null("PathIndicator") as PathIndicatorFX
+	if pi == null:
+		return
+	pi.play_path(path)
+
+
+func update_path_indicator_progress(current_pos: Vector3, current_index: int) -> void:
+	var pi := get_node_or_null("PathIndicator") as PathIndicatorFX
+	if pi == null:
+		return
+	pi.update_progress(current_pos, current_index)
+
+
+func stop_path_indicator() -> void:
+	var pi := get_node_or_null("PathIndicator") as PathIndicatorFX
+	if pi == null:
+		return
+	pi.stop()
 
 
 func _capsule_shape_middle_height(full_height: float, radius: float) -> float:
@@ -66,7 +105,7 @@ func _sync_capsule_collision_and_mesh() -> void:
 		if shape is CapsuleShape3D:
 			var cap := shape as CapsuleShape3D
 			cap.radius = r
-			cap.height = _capsule_shape_middle_height(h_full, r)
+			cap.height = h_full
 	var mi := get_node_or_null("BodyMesh") as MeshInstance3D
 	if mi != null and mi.mesh is CapsuleMesh:
 		var cm := mi.mesh as CapsuleMesh
@@ -106,7 +145,7 @@ func _setup_navigation_agent() -> void:
 	navigation_agent.target_desired_distance = 0.1
 	navigation_agent.path_max_distance = 1000.0
 	
-	navigation_agent.avoidance_enabled = false  
+	navigation_agent.avoidance_enabled = true
 	
 	await get_tree().physics_frame
 

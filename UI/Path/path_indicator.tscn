@@ -1,3 +1,6 @@
 [gd_scene format=3 uid="uid://i4sl1tjv3btt"]
 
+[ext_resource type="Script" path="res://UI/Path/path_indicator.gd" id="1_path_fx"]
+
 [node name="PathIndicator" type="Node3D" unique_id=1333771452]
+script = ExtResource("1_path_fx")

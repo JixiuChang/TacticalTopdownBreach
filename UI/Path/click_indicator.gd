@@ -53,6 +53,25 @@ func play_at(world_pos: Vector3) -> void:
 	set_process(true)
 
 
+func set_idle_at(world_pos: Vector3) -> void:
+	rotation_degrees = Vector3(-90, 0, 0)
+	global_position = world_pos
+	if is_instance_valid(dot):
+		global_position += world_pos - dot.global_position
+	visible = true
+	_apply_idle_visual_state()
+	set_process(false)
+
+
+func _is_child_of_tactical_unit() -> bool:
+	var n: Node = get_parent()
+	while n != null:
+		if n.has_method("is_unit") and bool(n.call("is_unit")):
+			return true
+		n = n.get_parent()
+	return false
+
+
 func _apply_surface_color_recursive(n: Node, color: Color) -> void:
 	if n is MeshInstance3D:
 		var mi := n as MeshInstance3D
@@ -73,4 +92,7 @@ func _process(delta: float) -> void:
 	if u >= 1.0:
 		ring.visible = false
 		ring.scale = Vector3.ONE
+		if not _is_child_of_tactical_unit():
+			visible = false
+			dot.visible = false
 		set_process(false)

@@ -76,9 +76,9 @@ func _process(_delta: float) -> void:
 
 	if hit:
 		var c: Object = hit.get("collider")
-		if c is Node and _is_unit_collider(c as Node):
+		if c is Node and _resolve_unit_from_hit(c as Node) != null:
 			hovering_unit = true
-			unit_node = c as Node
+			unit_node = _resolve_unit_from_hit(c as Node)
 		elif c is Node and (c as Node).is_in_group(GROUP_INTERACTIBLE):
 			hovering_interact = true
 
@@ -169,6 +169,15 @@ func _is_unit_collider(n: Node) -> bool:
 	if n.has_method(&"is_unit"):
 		return bool(n.call(&"is_unit"))
 	return false
+
+
+func _resolve_unit_from_hit(n: Node) -> Node:
+	var p: Node = n
+	while p != null:
+		if _is_unit_collider(p):
+			return p
+		p = p.get_parent()
+	return null
 
 
 func _apply_texture(tex: Texture2D, _hotspot: Vector2) -> void:
