@@ -14,6 +14,7 @@ var calculated_speed: float = 0.0
 
 var last_footstep_time: float = 0.0
 var elapsed_time: float = 0.0
+var indicator_started: bool = false
 
 func _init(
 	p: PackedVector3Array = PackedVector3Array(),
@@ -44,13 +45,39 @@ func _init(
 	else:
 		duration = 0.0
 
+
+func set_path(p: PackedVector3Array) -> void:
+	path = p
+	current_index = 0
+	elapsed_time = 0.0
+	last_footstep_time = 0.0
+	indicator_started = false
+	if path.size() > 1:
+		var total_distance := 0.0
+		for i in range(path.size() - 1):
+			total_distance += path[i].distance_to(path[i + 1])
+		duration = total_distance / calculated_speed if calculated_speed > 0.0 else 0.0
+	else:
+		duration = 0.0
+
+
 func execute(unit: Node, delta: float) -> void:
 	if completed || cancelled || path.is_empty():
 		return
+
+	if not indicator_started and unit != null and unit.has_method("play_path_indicator"):
+		indicator_started = true
+		unit.call("play_path_indicator", path)
 	
 	elapsed_time += delta
 	
 	_apply_unit_state(unit)
+	if _remaining_path_blocked_by_unit(unit):
+		if unit != null and unit.has_method("stop_path_indicator"):
+			unit.call("stop_path_indicator")
+		if GameStateManager.get_phase() == GameStateManager.GamePhase.EXECUTING:
+			GameStateManager.pause_execution()
+		return
 	
 	if current_index < path.size():
 		var target = path[current_index]
@@ -66,11 +93,44 @@ func execute(unit: Node, delta: float) -> void:
 			unit.global_position = current_pos + direction * min(move_distance, distance)
 		
 		_check_footstep(unit, elapsed_time)
+		if unit != null and unit.has_method("update_path_indicator_progress"):
+			unit.call("update_path_indicator_progress", unit.global_position, current_index)
 	
 	if current_index >= path.size():
 		if path.size() > 0:
 			unit.global_position = path[path.size() - 1]	
+		if unit != null and unit.has_method("stop_path_indicator"):
+			unit.call("stop_path_indicator")
 		complete()
+
+
+func _remaining_path_blocked_by_unit(unit: Node) -> bool:
+	if unit == null or not (unit is Node3D):
+		return false
+	var u3 := unit as Node3D
+	var world := u3.get_world_3d()
+	if world == null:
+		return false
+	var space := world.direct_space_state
+	var exclude := []
+	if u3 is CollisionObject3D:
+		exclude.append((u3 as CollisionObject3D).get_rid())
+	var from := u3.global_position + Vector3.UP * 0.2
+	var start_idx := clampi(current_index, 0, path.size() - 1)
+	for i in range(start_idx, path.size()):
+		var to := path[i] + Vector3.UP * 0.2
+		if from.distance_to(to) < 0.01:
+			continue
+		var q := PhysicsRayQueryParameters3D.create(from, to)
+		q.collision_mask = 2
+		q.exclude = exclude
+		var hit := space.intersect_ray(q)
+		if not hit.is_empty():
+			var c : Variant = hit.get("collider")
+			if c is Node and (c as Node).has_method("is_unit"):
+				return true
+		from = to
+	return false
 
 func _apply_unit_state(unit: Node) -> void:
 	if unit.has_method("set_stance"):
@@ -128,3 +188,4 @@ func restore_state(state: Dictionary) -> void:
 	
 	if calculated_speed == 0.0:
 		calculated_speed = MovementEnums.calculate_speed(move_speed, move_stance, weapon_state)
+	indicator_started = false

@@ -87,11 +87,11 @@ func _test_wall_structure() -> void:
 		errors.append("墙壁未加入 snapshotable 组")
 	
 	# 检查导出的属性
-	if !test_wall.has("debris_scene"):
+	if not ("debris_scene" in test_wall):
 		passed = false
 		errors.append("缺少 debris_scene 导出属性")
 	
-	if !test_wall.has("debris_count"):
+	if not ("debris_count" in test_wall):
 		passed = false
 		errors.append("缺少 debris_count 导出属性")
 	

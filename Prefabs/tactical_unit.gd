@@ -1,4 +1,4 @@
-# ~/Gameplay/Units/tactical_unit.gd
+# res://Prefabs/tactical_unit.gd
 class_name TacticalUnit
 extends CharacterBody3D
 
@@ -18,6 +18,9 @@ var current_height: float = 1.8
 var command_queue: CommandQueue = null
 @export var footstep_sound: AudioStreamPlayer3D = null
 
+## Tint for the child `ClickIndicator` (unshaded). Set from spawn slots later, or per-instance in the inspector.
+@export var click_indicator_color: Color = Color.WHITE
+
 func _ready() -> void:
 	add_to_group("units")
 	add_to_group("snapshotable")
@@ -33,9 +36,85 @@ func _ready() -> void:
 	
 	command_queue.unit = self
 	
-	_setup_collision()	
+	_setup_collision()
 	_setup_navigation_agent()
 	set_height(MovementEnums.get_stance_height(current_stance))
+	_apply_click_indicator_color()
+	_init_unit_click_indicator_anchor()
+
+
+func set_click_indicator_color(c: Color) -> void:
+	click_indicator_color = c
+	_apply_click_indicator_color()
+
+
+func _apply_click_indicator_color() -> void:
+	var ci := get_node_or_null("ClickIndicator") as ClickIndicatorFX
+	if ci != null:
+		ci.set_surface_color(click_indicator_color)
+	var pi := get_node_or_null("PathIndicator") as PathIndicatorFX
+	if pi != null:
+		pi.set_surface_color(click_indicator_color)
+
+
+func _init_unit_click_indicator_anchor() -> void:
+	var ci := get_node_or_null("ClickIndicator") as ClickIndicatorFX
+	if ci == null:
+		return
+	ci.set_idle_at(global_position)
+
+
+func play_click_indicator_at(world_pos: Vector3) -> void:
+	var ci := get_node_or_null("ClickIndicator") as ClickIndicatorFX
+	if ci == null:
+		return
+	ci.play_at(world_pos)
+
+
+func play_path_indicator(path: PackedVector3Array) -> void:
+	var pi := get_node_or_null("PathIndicator") as PathIndicatorFX
+	if pi == null:
+		return
+	pi.play_path(path)
+
+
+func update_path_indicator_progress(current_pos: Vector3, current_index: int) -> void:
+	var pi := get_node_or_null("PathIndicator") as PathIndicatorFX
+	if pi == null:
+		return
+	pi.update_progress(current_pos, current_index)
+
+
+func stop_path_indicator() -> void:
+	var pi := get_node_or_null("PathIndicator") as PathIndicatorFX
+	if pi == null:
+		return
+	pi.stop()
+
+
+func _capsule_shape_middle_height(full_height: float, radius: float) -> float:
+	return maxf(full_height - 2.0 * radius, 0.05)
+
+
+## Keeps CapsuleShape3D (physics) and CapsuleMesh (BodyMesh) aligned with `current_height` / `unit_radius`.
+func _sync_capsule_collision_and_mesh() -> void:
+	var r := unit_radius
+	var h_full := current_height
+	if collision_shape != null:
+		var shape = collision_shape.shape
+		if shape is CapsuleShape3D:
+			var cap := shape as CapsuleShape3D
+			cap.radius = r
+			cap.height = h_full
+	var mi := get_node_or_null("BodyMesh") as MeshInstance3D
+	if mi != null and mi.mesh is CapsuleMesh:
+		var cm := mi.mesh as CapsuleMesh
+		cm.radius = r
+		cm.height = h_full
+	if navigation_agent != null:
+		navigation_agent.radius = r
+		navigation_agent.height = h_full
+
 
 func _setup_collision() -> void:
 	collision_shape = get_node_or_null("CollisionShape3D")
@@ -46,13 +125,11 @@ func _setup_collision() -> void:
 		add_child(collision_shape)
 	
 	var shape = collision_shape.shape
-	if !shape || !(shape is CylinderShape3D):
-		shape = CylinderShape3D.new()
+	if !shape || !(shape is CapsuleShape3D):
+		shape = CapsuleShape3D.new()
 		collision_shape.shape = shape
 	
-	var cylinder = shape as CylinderShape3D
-	cylinder.radius = unit_radius
-	cylinder.height = unit_height
+	_sync_capsule_collision_and_mesh()
 
 func _setup_navigation_agent() -> void:
 	navigation_agent = get_node_or_null("NavigationAgent3D")
@@ -63,12 +140,12 @@ func _setup_navigation_agent() -> void:
 		add_child(navigation_agent)
 	
 	navigation_agent.radius = unit_radius
-	navigation_agent.height = unit_height
+	navigation_agent.height = current_height
 	navigation_agent.path_desired_distance = 0.1
 	navigation_agent.target_desired_distance = 0.1
 	navigation_agent.path_max_distance = 1000.0
 	
-	navigation_agent.avoidance_enabled = false  
+	navigation_agent.avoidance_enabled = true
 	
 	await get_tree().physics_frame
 
@@ -79,13 +156,6 @@ func set_stance(new_stance: MovementEnums.Stance) -> void:
 	current_stance = new_stance
 	var new_height = MovementEnums.get_stance_height(new_stance)
 	set_height(new_height)
-	
-	if collision_shape && collision_shape.shape is CylinderShape3D:
-		var cylinder = collision_shape.shape as CylinderShape3D
-		cylinder.height = new_height
-	
-	if navigation_agent:
-		navigation_agent.height = new_height
 
 func set_weapon_state(new_weapon_state: MovementEnums.WeaponState) -> void:
 	current_weapon_state = new_weapon_state
@@ -96,10 +166,7 @@ func set_height(new_height: float) -> void:
 	var current_pos = global_position
 	current_pos.y = new_height / 2.0 
 	global_position = current_pos
-	
-	if collision_shape && collision_shape.shape is CylinderShape3D:
-		var cylinder = collision_shape.shape as CylinderShape3D
-		cylinder.height = new_height
+	_sync_capsule_collision_and_mesh()
 
 func calculate_path_to(target: Vector3) -> PackedVector3Array:
 	if !navigation_agent:

@@ -1,0 +1,7 @@
+[gd_scene format=3 uid="uid://wmqfgb88rx38"]
+
+[ext_resource type="PackedScene" uid="uid://dd0jsx0tb3xbv" path="res://Assets/UI/Click_Indicator.glb" id="1_xg5eh"]
+[ext_resource type="Script" uid="uid://cq7ab4indrnjk" path="res://UI/Path/click_indicator.gd" id="2_rlqqc"]
+
+[node name="Click_Indicator" unique_id=162160483 instance=ExtResource("1_xg5eh")]
+script = ExtResource("2_rlqqc")

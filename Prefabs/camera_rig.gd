@@ -3,7 +3,10 @@ extends Node3D
 
 enum FreecamToggle { ON, OFF }
 
-@export var camera_height: float = 15.0
+## When `tactical_floor_heights` is empty, this is the tactical floor Y (click plane) and matches rig `global_position.y`. Q/E smooth adjust uses this plane.
+@export var camera_height: float = 0.0
+@export var camera_height_min: float = 0.0
+@export var camera_height_max: float = 8.0
 
 ## ON = perspective free camera; OFF = orthographic top-down.
 @export var freecam_toggle: FreecamToggle = FreecamToggle.ON
@@ -16,13 +19,21 @@ enum FreecamToggle { ON, OFF }
 @export var freecam_mmb_pitch_mult: float = 1.0
 @export var zoom_step: float = 1.08
 
-@export var arm_min_user: float = 4.0
-@export var arm_max: float = 90.0
+## Perspective: distance pivot→camera along view. Lower bound can rise with pitch via `_freecam_arm_min_after_pitch()`.
+@export var freecam_arm_min_user: float = 0.05
+@export var freecam_arm_max_user: float = 16.0
+
+## Ortho top-down: 3D distance (m) from floor anchor to camera. Anchor uses `top_down_absolute_plane_y` (world Y), not pivot stacking.
+@export var top_down_arm_min_user: float = 0.05
+@export var top_down_arm_max_user: float = 0.5
+
+## Top-down: rig `global_position.y` and the Y of the floor anchor for zoom distance. For now world 0; freecam / `get_tactical_click_plane_y()` unchanged for picking.
+@export var top_down_absolute_plane_y: float = 0.0
 
 @export var pitch_min: float = -85.0
 @export var pitch_max: float = -18.0
 
-@export var top_down_arm: float = 22.0
+@export var top_down_arm: float = 0.25
 @export var top_down_ortho_size: float = 22.0
 ## Ortho frustum half-extent at startup `top_down_arm`; wheel changes arm and scales size so zoom is visible.
 ## Top-down **middle** button: horizontal drag only (yaw). Vertical mouse motion ignored.
@@ -34,12 +45,12 @@ enum FreecamToggle { ON, OFF }
 @export var freecam_default_position_xz: Vector2 = Vector2.ZERO
 @export var freecam_default_yaw_degrees: float = 0.0
 @export var freecam_default_pitch_degrees: float = -35.0
-@export var freecam_default_arm: float = 20.0
+@export var freecam_default_arm: float = 4.0
 
 @export_group("Defaults: top-down (first toggle into mode / I key)")
 @export var topdown_default_position_xz: Vector2 = Vector2.ZERO
 @export var topdown_default_yaw_degrees: float = 0.0
-@export var topdown_default_arm: float = 22.0
+@export var topdown_default_arm: float = 0.25
 @export var topdown_default_ortho_size: float = 22.0
 @export var topdown_default_pitch_degrees: float = -90.0
 
@@ -52,11 +63,18 @@ enum FreecamToggle { ON, OFF }
 @export var action_back: StringName = &"camera_back"
 @export var action_left: StringName = &"camera_left"
 @export var action_right: StringName = &"camera_right"
+@export var action_height_down: StringName = &"floorplan_down"
+@export var action_height_up: StringName = &"floorplan_up"
+@export var camera_height_adjust_speed: float = 3.0
+
+## 2+ entries: Q/E switches discrete floors (rig Y = that height). 1 entry: fixed plane at that Y. Empty: rig Y / click plane = `camera_height` (initialized from `default_tactical_plane_y` in `_ready`).
+@export var tactical_floor_heights: PackedFloat32Array = PackedFloat32Array()
+@export var default_tactical_plane_y: float = 0.0
 
 @onready var pivot: Node3D = $Pivot
 @onready var cam: Camera3D = $Pivot/Camera3D
 
-var _arm: float = 20.0
+var _arm: float = 4.0
 var _yaw: float = 0.0
 var _pitch: float = -35.0
 ## Euler X in degrees while orthographic top-down (starts straight down).
@@ -64,7 +82,7 @@ var _top_down_pitch_deg: float = -90.0
 var _rmb: bool = false
 var _mmb: bool = false
 ## Baseline arm for pairing `top_down_ortho_size` with scroll-adjusted `top_down_arm` (ortho alone ignores depth).
-var _top_down_arm_ortho_ref: float = 22.0
+var _top_down_arm_ortho_ref: float = 0.25
 
 var _freecam_has_snapshot: bool = false
 var _fc_px: float
@@ -74,6 +92,7 @@ var _fc_pitch: float
 var _fc_arm: float
 
 var _topdown_has_snapshot: bool = false
+var _tactical_floor_index: int = 0
 var _td_px: float
 var _td_pz: float
 var _td_yaw: float
@@ -84,13 +103,64 @@ var _td_ortho_ref: float
 
 func _ready() -> void:
 	cam.current = true
-	_arm = clampf(_arm, arm_min_user, arm_max)
+	if tactical_floor_heights.is_empty():
+		camera_height = default_tactical_plane_y
+	camera_height = clampf(camera_height, camera_height_min, camera_height_max)
+	if tactical_floor_heights.size() >= 2:
+		_tactical_floor_index = clampi(_closest_floor_index(camera_height), 0, tactical_floor_heights.size() - 1)
+		camera_height = clampf(
+			tactical_floor_heights[_tactical_floor_index],
+			camera_height_min,
+			camera_height_max
+		)
+	_arm = clampf(_arm, freecam_arm_min_user, freecam_arm_max_user)
+	top_down_arm = clampf(top_down_arm, top_down_arm_min_user, top_down_arm_max_user)
 	_top_down_arm_ortho_ref = top_down_arm
+	global_position.x = 0.0
+	global_position.z = 0.0
+	_sync_rig_plane_y()
 	_apply_mode(true)
 
 
+## World Y for mouse ray ∩ horizontal plane (InputRouter / planning). Empty `tactical_floor_heights`: returns `camera_height` (tactical plane = rig Y).
+func get_tactical_click_plane_y() -> float:
+	if tactical_floor_heights.size() >= 2:
+		var i := clampi(_tactical_floor_index, 0, tactical_floor_heights.size() - 1)
+		return tactical_floor_heights[i]
+	if tactical_floor_heights.size() == 1:
+		return tactical_floor_heights[0]
+	return camera_height
+
+
+## Index into `tactical_floor_heights`（离散楼层时供关卡脚本使用）。
+func get_tactical_floor_index() -> int:
+	if tactical_floor_heights.size() >= 2:
+		return clampi(_tactical_floor_index, 0, tactical_floor_heights.size() - 1)
+	if tactical_floor_heights.size() == 1:
+		return 0
+	return 0
+
+
+func _closest_floor_index(world_y: float) -> int:
+	var best_i := 0
+	var best_d := INF
+	for i: int in tactical_floor_heights.size():
+		var d := absf(tactical_floor_heights[i] - world_y)
+		if d < best_d:
+			best_d = d
+			best_i = i
+	return best_i
+
+
+func _sync_rig_plane_y() -> void:
+	if freecam_toggle == FreecamToggle.OFF:
+		global_position.y = top_down_absolute_plane_y
+	else:
+		global_position.y = get_tactical_click_plane_y()
+
+
 func _physics_process(_delta: float) -> void:
-	global_position.y = camera_height
+	_sync_rig_plane_y()
 
 
 ## Forward (W / screen-up on the ground) and right (D / screen-right), both unit vectors on XZ from current camera pose.
@@ -132,6 +202,29 @@ func _process(delta: float) -> void:
 		var f: Vector3 = fr[0]
 		var r: Vector3 = fr[1]
 		global_position += (f * (-iz) + r * ix) * move_speed * delta
+	if tactical_floor_heights.size() >= 2:
+		if Input.is_action_just_pressed(action_height_up):
+			_tactical_floor_index = mini(_tactical_floor_index + 1, tactical_floor_heights.size() - 1)
+			camera_height = clampf(
+				tactical_floor_heights[_tactical_floor_index],
+				camera_height_min,
+				camera_height_max
+			)
+		elif Input.is_action_just_pressed(action_height_down):
+			_tactical_floor_index = maxi(_tactical_floor_index - 1, 0)
+			camera_height = clampf(
+				tactical_floor_heights[_tactical_floor_index],
+				camera_height_min,
+				camera_height_max
+			)
+	else:
+		var ih := Input.get_axis(action_height_down, action_height_up)
+		if absf(ih) > 0.001:
+			camera_height = clampf(
+				camera_height + ih * camera_height_adjust_speed * delta,
+				camera_height_min,
+				camera_height_max
+			)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -225,50 +318,16 @@ func _zoom_scroll(direction: int, scroll_factor: float = 1.0) -> void:
 	_update_free_camera()
 
 
-func _min_zoom_cam_world_y() -> float:
-	return camera_height * 0.5
-
-
-func _max_zoom_cam_world_y() -> float:
-	return camera_height * 2.0
-
-
-## Top-down only: arm clamped so camera world Y stays in [H/2, 2H]. Pivot must already be set for top-down.
-func _clamp_top_down_arm_for_cam_height(arm_desired: float) -> float:
-	var axis_local := Vector3(0.0, 1.0, 0.0)
-	var d: Vector3 = pivot.global_transform.basis * axis_local
-	if d.length_squared() > 1e-12:
-		d = d.normalized()
-	var dy: float = d.y
-	var y0: float = pivot.global_position.y
-	var y_lo := _min_zoom_cam_world_y()
-	var y_hi := _max_zoom_cam_world_y()
-	var geom_lo := maxf(arm_min_user, zoom_margin_above_plane)
-	var arm := maxf(arm_desired, 0.01)
-	if absf(dy) > 1e-4:
-		var t0 := (y_lo - y0) / dy
-		var t1 := (y_hi - y0) / dy
-		var t_y_lo := minf(t0, t1)
-		var t_y_hi := maxf(t0, t1)
-		var t_lo := maxf(t_y_lo, geom_lo)
-		var t_hi := t_y_hi
-		if t_lo > t_hi:
-			arm = t_hi
-		else:
-			arm = clampf(arm, t_lo, t_hi)
-	else:
-		var s_lo := maxf(geom_lo, camera_height * 0.5)
-		var s_hi := camera_height * 2.0
-		arm = clampf(arm, s_lo, s_hi)
-	return arm
+func _top_down_floor_anchor_world() -> Vector3:
+	return Vector3(global_position.x, top_down_absolute_plane_y, global_position.z)
 
 
 func _freecam_arm_min_after_pitch() -> float:
 	var bz: Vector3 = pivot.global_transform.basis.z
 	if bz.y <= 0.001:
-		return arm_min_user
+		return freecam_arm_min_user
 	var geom_y := zoom_margin_above_plane / bz.y
-	return maxf(arm_min_user, geom_y)
+	return maxf(freecam_arm_min_user, geom_y)
 
 
 func _pivot_rotation_basis() -> void:
@@ -280,22 +339,36 @@ func _update_free_camera() -> void:
 		return
 	pivot.position = Vector3.ZERO
 	_pivot_rotation_basis()
-	_arm = clampf(_arm, _freecam_arm_min_after_pitch(), arm_max)
+	_arm = clampf(_arm, _freecam_arm_min_after_pitch(), freecam_arm_max_user)
 	cam.projection = Camera3D.PROJECTION_PERSPECTIVE
 	cam.position = Vector3(0.0, 0.0, _arm)
 	cam.rotation = Vector3.ZERO
 
 
 func _apply_top_down_camera() -> void:
+	_sync_rig_plane_y()
+	# Identity pivot: top-down pose is entirely in `cam` global transform (world pos = intended offset from y=0 plane).
 	pivot.position = Vector3.ZERO
-	pivot.rotation = Vector3(deg_to_rad(_top_down_pitch_deg), _yaw, 0.0)
+	pivot.rotation = Vector3.ZERO
 	cam.projection = Camera3D.PROJECTION_ORTHOGONAL
-	top_down_arm = _clamp_top_down_arm_for_cam_height(top_down_arm)
+	top_down_arm = clampf(top_down_arm, top_down_arm_min_user, top_down_arm_max_user)
+	var rx := global_position.x
+	var rz := global_position.z
+	var py := top_down_absolute_plane_y
+	cam.global_position = Vector3(rx, py + top_down_arm, rz)
+	cam.global_rotation = Vector3(deg_to_rad(_top_down_pitch_deg), _yaw, 0.0)
+	var anchor := _top_down_floor_anchor_world()
+	var dist := cam.global_position.distance_to(anchor)
+	if dist > 1e-6:
+		var d_target := clampf(dist, top_down_arm_min_user, top_down_arm_max_user)
+		top_down_arm *= d_target / dist
+		cam.global_position = Vector3(rx, py + top_down_arm, rz)
+	else:
+		top_down_arm = top_down_arm_min_user
+		cam.global_position = Vector3(rx, py + top_down_arm, rz)
 	var arm_s := maxf(top_down_arm, 0.01)
 	cam.size = top_down_ortho_size * (_top_down_arm_ortho_ref / arm_s)
 	_arm = top_down_arm
-	cam.position = Vector3(0.0, top_down_arm, 0.0)
-	cam.rotation = Vector3.ZERO
 
 
 func _apply_mode(_initial: bool) -> void:
@@ -336,6 +409,7 @@ func _restore_freecam_state() -> void:
 func _restore_topdown_state() -> void:
 	global_position.x = _td_px
 	global_position.z = _td_pz
+	_sync_rig_plane_y()
 	_yaw = _td_yaw
 	top_down_arm = _td_arm
 	top_down_ortho_size = _td_ortho
@@ -348,13 +422,14 @@ func _apply_freecam_defaults() -> void:
 	global_position.z = freecam_default_position_xz.y
 	_yaw = deg_to_rad(freecam_default_yaw_degrees)
 	_pitch = freecam_default_pitch_degrees
-	_arm = clampf(freecam_default_arm, arm_min_user, arm_max)
+	_arm = clampf(freecam_default_arm, freecam_arm_min_user, freecam_arm_max_user)
 	_update_free_camera()
 
 
 func _apply_topdown_defaults() -> void:
 	global_position.x = topdown_default_position_xz.x
 	global_position.z = topdown_default_position_xz.y
+	_sync_rig_plane_y()
 	_yaw = deg_to_rad(topdown_default_yaw_degrees)
 	_top_down_pitch_deg = topdown_default_pitch_degrees
 	top_down_arm = topdown_default_arm

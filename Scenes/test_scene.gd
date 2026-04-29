@@ -9,12 +9,18 @@ extends Node3D
 @export_multiline var briefing_body: String = "This is a sandbox test map.\nYou can try UI flow, planning, and execution timing."
 
 const GROUP_BRIEFING_BLOCKS_INPUT: String = "briefing_blocks_input"
+const DEBUG_GROUND_GROUP: StringName = &"debug_ground_click"
+const SPAWN_NAMES: Array[StringName] = [&"Spawn1", &"Spawn2", &"Spawn3", &"Spawn4"]
+const SPAWN_HEIGHT_CLEARANCE: float = 0.05
 
 var tests_passed: int = 0
 var tests_failed: int = 0
 
 var _briefing_layer: CanvasLayer = null
 var _briefing_panel: Control = null
+@onready var _click_indicator: ClickIndicatorFX = $ClickIndicator
+@onready var _spawn_root: Node3D = $UnitSpawn
+@onready var _units_root: Node3D = $Units
 
 func _ready() -> void:
 	if run_automated_tests:
@@ -23,7 +29,75 @@ func _ready() -> void:
 	
 	GameStateManager.reset_gamestate()
 	await get_tree().process_frame
+	_sync_units_from_spawns()
 	_build_briefing_ui()
+	if not run_automated_tests:
+		_connect_ground_click_indicator()
+
+
+func _connect_ground_click_indicator() -> void:
+	var router := get_node_or_null("/root/InputRouter")
+	if router == null:
+		return
+	if router.planning_ground_pick.is_connected(_on_router_planning_ground_pick):
+		pass
+	else:
+		router.planning_ground_pick.connect(_on_router_planning_ground_pick)
+
+
+func _sync_units_from_spawns() -> void:
+	if _spawn_root == null or _units_root == null:
+		return
+	var count := mini(SPAWN_NAMES.size(), _units_root.get_child_count())
+	for i in range(count):
+		var sname := SPAWN_NAMES[i]
+		var spawn := _spawn_root.get_node_or_null(NodePath(str(sname))) as Marker3D
+		var unit := _units_root.get_child(i) as Node3D
+		if spawn == null or unit == null:
+			continue
+		var p := spawn.global_position
+		var unit_height_v: Variant = unit.get("current_height")
+		var unit_height := float(unit_height_v) if unit_height_v is float or unit_height_v is int else 1.8
+		p.y += unit_height * 0.5 + SPAWN_HEIGHT_CLEARANCE
+		unit.global_position = p
+		unit.set("unit_id", i)
+		unit.set("unit_name", str(sname))
+		var spawn_color: Variant = spawn.get("spawn_color")
+		if spawn_color is Color:
+			unit.set("click_indicator_color", spawn_color)
+			if unit.has_method("set_click_indicator_color"):
+				unit.call("set_click_indicator_color", spawn_color)
+			if unit.has_method("play_click_indicator_at"):
+				unit.call("play_click_indicator_at", p)
+
+
+func _on_router_planning_ground_pick(hit_position: Vector3, collider: Object) -> void:
+	if run_automated_tests:
+		return
+	if get_tree().get_first_node_in_group(GROUP_BRIEFING_BLOCKS_INPUT) != null:
+		return
+	if GameStateManager.get_phase() == GameStateManager.GamePhase.EXECUTING:
+		return
+	if collider is Node and not _node_or_ancestor_in_ground_group(collider as Node):
+		return
+	var router := get_node_or_null("/root/InputRouter")
+	var selected: Node = null
+	if router != null and router.has_method("get_selected_unit"):
+		selected = router.call("get_selected_unit") as Node
+	if selected != null and selected.has_method("play_click_indicator_at"):
+		selected.call("play_click_indicator_at", hit_position)
+		return
+	if _click_indicator != null:
+		_click_indicator.play_at(hit_position)
+
+
+func _node_or_ancestor_in_ground_group(n: Node) -> bool:
+	var p: Node = n
+	while p != null:
+		if p.is_in_group(DEBUG_GROUND_GROUP):
+			return true
+		p = p.get_parent()
+	return false
 
 
 func _unhandled_input(event: InputEvent) -> void:
