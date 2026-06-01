@@ -68,8 +68,39 @@ theme_override_constants/margin_right = 16
 theme_override_constants/margin_bottom = 16
 
 [node name="Button" type="Button" parent="MarginContainer/PhaseToggleButton" unique_id=276453132]
-custom_minimum_size = Vector2(64, 64)
+custom_minimum_size = Vector2(110, 44)
 layout_mode = 2
 focus_mode = 0
+
+[node name="LeftControls" type="MarginContainer" parent="MarginContainer" unique_id=267579654]
+layout_mode = 2
+size_flags_horizontal = 1
+size_flags_vertical = 8
+mouse_filter = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer/LeftControls" unique_id=267579655]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 10
+
+[node name="ModeButton" type="Button" parent="MarginContainer/LeftControls/HBoxContainer" unique_id=267579656]
+custom_minimum_size = Vector2(130, 44)
+layout_mode = 2
+focus_mode = 0
+text = "Mode: Stand"
+
+[node name="ClearPathButton" type="Button" parent="MarginContainer/LeftControls/HBoxContainer" unique_id=267579658]
+custom_minimum_size = Vector2(120, 44)
+layout_mode = 2
+focus_mode = 0
+text = "Clear Path"
+
+[node name="DeselectButton" type="Button" parent="MarginContainer/LeftControls/HBoxContainer" unique_id=267579657]
+custom_minimum_size = Vector2(110, 44)
+layout_mode = 2
+focus_mode = 0
+text = "Deselect"
 
 [node name="GameCursor" parent="." instance=ExtResource("2_cursor")]
