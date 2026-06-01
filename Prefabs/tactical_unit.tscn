@@ -9,7 +9,6 @@
 height = 1.8
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
-radius = 0.5
 height = 1.8
 
 [node name="TacticalUnit" type="CharacterBody3D" unique_id=836350695]

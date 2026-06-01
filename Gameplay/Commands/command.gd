@@ -12,10 +12,12 @@ func execute(unit: Node, delta: float) -> void:
 	pass
 
 func should_start(current_time: float) -> bool:
-	return current_time >= start_time && !completed && !cancelled
+	# Timeline counts down (180 -> 0), so command starts when current_time <= start_time.
+	return current_time <= start_time && !completed && !cancelled
 
 func should_end(current_time: float) -> bool:
-	return current_time >= (start_time + duration) || completed || cancelled
+	# End when countdown passed start_time - duration.
+	return current_time <= (start_time - duration) || completed || cancelled
 
 func cancel() -> void:
 	cancelled = true
@@ -23,6 +25,11 @@ func cancel() -> void:
 
 func complete() -> void:
 	completed = true
+
+## Called when the queue force-completes this command because the timeline
+## advanced past its window. Subclasses snap the unit to its final state here.
+func finalize(unit: Node) -> void:
+	pass
 
 func capture_state() -> Dictionary:
 	return {

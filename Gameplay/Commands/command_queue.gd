@@ -39,6 +39,7 @@ func _process_commands() -> void:
 			break
 		
 		if current_command.should_end(current_time):
+			current_command.finalize(unit)
 			current_command.complete()
 			command_completed.emit(current_command)
 			commands.pop_front()
@@ -66,7 +67,8 @@ func add_command(command: Command) -> void:
 			start_time = current_time
 	else:
 		var last_command = commands[commands.size() - 1]
-		start_time = last_command.start_time + last_command.duration
+		# Countdown timeline: next command starts after previous consumes its duration.
+		start_time = last_command.start_time - last_command.duration
 	
 	command.start_time = start_time
 	commands.append(command)

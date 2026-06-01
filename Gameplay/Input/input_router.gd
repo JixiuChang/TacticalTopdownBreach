@@ -10,6 +10,10 @@ signal path_drawing_started(unit: Node, start_position: Vector3)
 signal path_drawing_updated(unit: Node, current_path: PackedVector3Array)
 signal path_drawing_finished(unit: Node, final_path: PackedVector3Array)
 signal path_clicked(unit: Node, path_index: int, position: Vector3)
+## Trim a unit's path back to the placed waypoint nearest the clicked world position.
+signal path_trim_requested(unit: Node, world_position: Vector3)
+## Clear a unit's entire planned path.
+signal path_clear_requested(unit: Node)
 
 var player_keybind: Node = null
 var selected_unit: Node = null  # 只能选择一个单位
@@ -154,6 +158,12 @@ func _handle_mouse_button(event: InputEventMouseButton) -> void:
 	if phase == GameStateManager.GamePhase.EXECUTING:
 		return
 	
+	# Clicks over interactive UI (e.g. the Execute button) must drive the button,
+	# never set a path endpoint behind it. The button itself consumes the press;
+	# this guard is a safety net so a selected unit never "leaks" a ground pick.
+	if _is_pointer_over_ui():
+		return
+	
 	# 与 NAD-LAB 示例一致：用视口当前鼠标像素（与 `get_mouse_position()` 同源），避免与自定义光标帧不同步。
 	var mouse_pos := get_viewport().get_mouse_position()
 	var ground_hit := _raycast_ground(mouse_pos)
@@ -171,6 +181,13 @@ func _handle_mouse_button(event: InputEventMouseButton) -> void:
 
 func _handle_mouse_motion(event: InputEventMouseMotion) -> void:
 	return
+
+
+## True when the cursor is over a clickable Control (mouse_filter != IGNORE),
+## such as a UI button. Used to keep world clicks from firing under the UI.
+func _is_pointer_over_ui() -> bool:
+	var c := get_viewport().gui_get_hovered_control()
+	return c != null and c.mouse_filter != Control.MOUSE_FILTER_IGNORE
 
 func _on_mouse_press(world_pos: Vector3, screen_pos: Vector2, phase: GameStateManager.GamePhase, has_ground_hit: bool) -> bool:
 	var clicked_unit := _raycast_unit(screen_pos)
@@ -204,6 +221,7 @@ func _on_mouse_press(world_pos: Vector3, screen_pos: Vector2, phase: GameStateMa
 			_pending_path_trim = {
 				"unit": path_click_result.unit,
 				"path_index": path_click_result.path_index,
+				"position": path_click_result.get("position", Vector3.ZERO),
 			}
 			_path_click_screen_accum = 0.0
 			return true
@@ -222,9 +240,12 @@ func _on_mouse_release(world_pos: Vector3, screen_pos: Vector2, phase: GameState
 	if not _pending_path_trim.is_empty():
 		var u: Node = _pending_path_trim.get("unit") as Node
 		var idx: int = int(_pending_path_trim.get("path_index", -1))
+		var trim_pos_v: Variant = _pending_path_trim.get("position", Vector3.ZERO)
+		var trim_pos: Vector3 = trim_pos_v if trim_pos_v is Vector3 else Vector3.ZERO
 		_pending_path_trim.clear()
+		# Treat a near-stationary click on the path as "trim back to this waypoint".
 		if _path_click_screen_accum <= path_trim_max_screen_drag_px and u != null and idx >= 0:
-			_trim_path_to_index(u, idx)
+			path_trim_requested.emit(u, trim_pos)
 		_path_click_screen_accum = 0.0
 		return
 	
@@ -386,22 +407,11 @@ func _check_path_click(unit: Node, screen_pos: Vector2) -> Dictionary:
 	return {}
 
 
-func _trim_path_to_index(unit: Node, path_index: int) -> void:
-	var cq: Variant = unit.get("command_queue")
-	if cq == null:
+## Requests `UnitNavigation` to clear the currently selected unit's planned path.
+func request_clear_selected_path() -> void:
+	if selected_unit == null:
 		return
-	var mc: Variant = cq.get_current_command()
-	if mc == null or not (mc is MoveCommand):
-		return
-	var move: MoveCommand = mc as MoveCommand
-	if path_index < 0 or path_index >= move.path.size():
-		return
-	var newp := PackedVector3Array()
-	for i in range(path_index + 1):
-		newp.append(move.path[i])
-	move.set_path(newp)
-	if path_visualizer and path_visualizer.has_method("visualize_path"):
-		path_visualizer.visualize_path(unit, newp)
+	path_clear_requested.emit(selected_unit)
 
 
 ## 当前路径「端点」：有 MoveCommand 则取路径末点，否则取脚底（战术上近似 2D 落点）。

@@ -13,6 +13,8 @@ var _time: float = 0.0
 
 
 func _ready() -> void:
+	if _is_child_of_tactical_unit():
+		top_level = true
 	scale = Vector3(0.25, 0.25, 0.25)
 	_apply_surface_color_recursive(ring, _surface_color)
 	_apply_surface_color_recursive(dot, _surface_color)

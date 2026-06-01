@@ -13,6 +13,7 @@ var navigation_agent: NavigationAgent3D = null
 
 var current_stance: MovementEnums.Stance = MovementEnums.Stance.STANDING
 var current_weapon_state: MovementEnums.WeaponState = MovementEnums.WeaponState.LOW
+var current_movement_speed: MovementEnums.MovementSpeed = MovementEnums.MovementSpeed.WALKING
 var current_height: float = 1.8
 
 var command_queue: CommandQueue = null
@@ -103,12 +104,24 @@ func _sync_capsule_collision_and_mesh() -> void:
 	if collision_shape != null:
 		var shape = collision_shape.shape
 		if shape is CapsuleShape3D:
+			# Prefab sub-resources are shared across instances by default, so
+			# resizing one unit would mutate every other unit. Make this
+			# instance own a unique copy before changing it.
+			if not shape.resource_local_to_scene:
+				shape = shape.duplicate()
+				shape.resource_local_to_scene = true
+				collision_shape.shape = shape
 			var cap := shape as CapsuleShape3D
 			cap.radius = r
 			cap.height = h_full
 	var mi := get_node_or_null("BodyMesh") as MeshInstance3D
 	if mi != null and mi.mesh is CapsuleMesh:
-		var cm := mi.mesh as CapsuleMesh
+		var mesh_res = mi.mesh
+		if not mesh_res.resource_local_to_scene:
+			mesh_res = mesh_res.duplicate()
+			mesh_res.resource_local_to_scene = true
+			mi.mesh = mesh_res
+		var cm := mesh_res as CapsuleMesh
 		cm.radius = r
 		cm.height = h_full
 	if navigation_agent != null:
@@ -159,6 +172,10 @@ func set_stance(new_stance: MovementEnums.Stance) -> void:
 
 func set_weapon_state(new_weapon_state: MovementEnums.WeaponState) -> void:
 	current_weapon_state = new_weapon_state
+
+
+func set_movement_speed(new_speed: MovementEnums.MovementSpeed) -> void:
+	current_movement_speed = new_speed
 
 func set_height(new_height: float) -> void:
 	current_height = new_height
@@ -252,6 +269,7 @@ func get_unit_name() -> String:
 func capture_state() -> Dictionary:
 	var state = {
 		"position": global_position,
+		"movement_speed": current_movement_speed,
 		"stance": current_stance,
 		"weapon_state": current_weapon_state,
 		"height": current_height,
@@ -265,6 +283,7 @@ func capture_state() -> Dictionary:
 
 func restore_state(state: Dictionary) -> void:
 	global_position = state.get("position", Vector3.ZERO)
+	current_movement_speed = state.get("movement_speed", MovementEnums.MovementSpeed.WALKING)
 	current_stance = state.get("stance", MovementEnums.Stance.STANDING)
 	current_weapon_state = state.get("weapon_state", MovementEnums.WeaponState.LOW)
 	current_height = state.get("height", 1.8)
